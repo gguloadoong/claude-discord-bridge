@@ -40,11 +40,11 @@ if (!token) {
     console.error('Token is required.')
     process.exit(1)
   }
-  let envContent = `DISCORD_BOT_TOKEN=${token.trim()}\n`
+  let envContent = `DISCORD_BOT_TOKEN="${token.trim()}"\n`
 
   const secret = await ask('Shared secret for bot<->server auth (optional, press Enter to skip): ')
   if (secret.trim()) {
-    envContent += `BRIDGE_SECRET=${secret.trim()}\n`
+    envContent += `BRIDGE_SECRET="${secret.trim()}"\n`
   }
 
   writeFileSync(envPath, envContent)

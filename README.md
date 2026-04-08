@@ -80,18 +80,36 @@ This creates a tmux session with:
 
 ### 5. Monitor
 
+The dashboard opens automatically in a new terminal window (macOS iTerm2). All channels are visible at once in a split-pane grid:
+
+```
+┌───────────────────────────┬───────────────────────────┐
+│ #frontend -> ~/app [:8801]│ #backend -> ~/api [:8802] │
+│                           │                           │
+│  (Claude Code session)    │  (Claude Code session)    │
+│                           │                           │
+├───────────────────────────┼───────────────────────────┤
+│ #infra -> ~/infra [:8803] │ Bot (3 channels)          │
+│                           │                           │
+│  (Claude Code session)    │  (bot routing logs)       │
+│                           │                           │
+└───────────────────────────┴───────────────────────────┘
+  BRIDGE | ...                  Ctrl+B z=zoom q=jump d=detach
+```
+
+Each pane title shows: **channel name → project path [port]**
+
+| Keys | Action |
+|------|--------|
+| `Ctrl+B` → `z` | **Zoom** — fullscreen the current pane (press again to return to grid) |
+| `Ctrl+B` → `arrow` | Move focus between panes |
+| `Ctrl+B` → `q` → number | Jump to a specific pane by number |
+| `Ctrl+B` → `d` | Detach (keeps running in background) |
+
+To reattach later:
 ```bash
 tmux attach -t claude-discord-bridge
 ```
-
-Switch windows:
-| Keys | Window |
-|------|--------|
-| `Ctrl+B` → `0` | Bot logs |
-| `Ctrl+B` → `1` | First project |
-| `Ctrl+B` → `2` | Second project |
-| `Ctrl+B` → `n` | Next window |
-| `Ctrl+B` → `d` | Detach (keeps running) |
 
 ### 6. Stop
 
@@ -164,6 +182,24 @@ BRIDGE_SECRET=your_generated_secret
 ```
 
 When set, bot.js sends the secret in `X-Bridge-Secret` header, and channel-server.js rejects requests without it.
+
+**User allowlist** (recommended):
+
+Add `allowed_users` to a channel in `config.json` to restrict who can trigger Claude Code:
+
+```json
+{
+  "name": "my-project",
+  "slug": "proj",
+  "port": 8801,
+  "cwd": "/path/to/project",
+  "allowed_users": ["123456789012345678"]
+}
+```
+
+Find your Discord user ID: User Settings → Advanced → Developer Mode ON → click your avatar → Copy User ID.
+
+> **Warning**: Without `allowed_users`, anyone with access to the Discord channel can control Claude Code on the mapped project. Set this for any channel that isn't fully private.
 
 ## Discord Commands
 

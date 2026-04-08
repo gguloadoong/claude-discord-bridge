@@ -4,7 +4,8 @@
       "name": "my-project",
       "slug": "myproject",
       "port": 8801,
-      "cwd": "/path/to/your/project"
+      "cwd": "/path/to/your/project",
+      "allowed_users": ["YOUR_DISCORD_USER_ID"]
     },
     "9876543210987654321": {
       "name": "another-project",

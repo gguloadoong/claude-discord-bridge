@@ -37,7 +37,12 @@ const SHARED_SECRET = process.env.BRIDGE_SECRET || ''
 // Build channel ID → config mapping
 const channelMap = new Map()
 for (const [channelId, info] of Object.entries(config.channels)) {
-  channelMap.set(channelId, { port: info.port, name: info.name, slug: info.slug })
+  channelMap.set(channelId, {
+    port: info.port,
+    name: info.name,
+    slug: info.slug,
+    allowedUsers: info.allowed_users || null, // null = allow all
+  })
 }
 
 // ─── HTTP helpers ───────────────────────────────────────────────────────────
@@ -62,6 +67,7 @@ async function postWithRetry(url, payload, retries = 2) {
     }
     await new Promise((r) => setTimeout(r, 500 * (i + 1)))
   }
+  throw new Error(`All ${retries + 1} attempts failed`)
 }
 
 // ─── Health check ───────────────────────────────────────────────────────────
@@ -117,6 +123,11 @@ client.on(Events.MessageCreate, async (message) => {
 
   const target = channelMap.get(message.channelId)
   if (!target) return
+
+  // Check user allowlist (if configured)
+  if (target.allowedUsers && !target.allowedUsers.includes(message.author.id)) {
+    return // silently ignore unauthorized users
+  }
 
   // Warn if server is known to be down
   if (serverHealth.get(message.channelId) === false) {

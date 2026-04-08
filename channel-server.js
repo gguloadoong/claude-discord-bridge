@@ -174,6 +174,16 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
 mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: args } = req.params
 
+  // Validate chat_id matches this channel (prevent cross-channel access)
+  if (args.chat_id && args.chat_id !== CHANNEL_ID) {
+    return { content: [{ type: 'text', text: `error: chat_id must be ${CHANNEL_ID}` }], isError: true }
+  }
+
+  // Validate required text field
+  if ((name === 'reply' || name === 'edit_message') && !args.text) {
+    return { content: [{ type: 'text', text: 'error: text is required' }], isError: true }
+  }
+
   switch (name) {
     case 'reply': {
       const results = await discordSend(args.chat_id, args.text, args.reply_to)
@@ -271,8 +281,8 @@ const httpServer = createServer(async (req, res) => {
     return
   }
 
-  // Read body with size limit
-  let body = ''
+  // Read body with size limit (Buffer-safe for multi-byte UTF-8)
+  const chunks = []
   let size = 0
   try {
     for await (const chunk of req) {
@@ -282,13 +292,15 @@ const httpServer = createServer(async (req, res) => {
         res.end('payload too large')
         return
       }
-      body += chunk
+      chunks.push(chunk)
     }
   } catch {
     res.writeHead(400)
     res.end('bad request')
     return
   }
+
+  const body = Buffer.concat(chunks).toString('utf-8')
 
   try {
     const data = JSON.parse(body)

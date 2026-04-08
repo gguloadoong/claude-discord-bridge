@@ -3,16 +3,16 @@
 # Usage: bash start.sh
 #
 # Dashboard layout (example with 3 channels):
-# ┌─────────────────┬─────────────────┐
-# │  #channel-1      │  #channel-2      │
-# │  (Claude Code)   │  (Claude Code)   │
-# ├─────────────────┼─────────────────┤
-# │  #channel-3      │  Bot logs        │
-# │  (Claude Code)   │                  │
-# └─────────────────┴─────────────────┘
+# ┌───────────────────────┬───────────────────────┐
+# │ #frontend → ~/app     │ #backend → ~/api      │
+# │ (Claude Code)         │ (Claude Code)         │
+# ├───────────────────────┼───────────────────────┤
+# │ #infra → ~/infra      │ Bot (3 channels)      │
+# │ (Claude Code)         │                       │
+# └───────────────────────┴───────────────────────┘
 #
 # Controls:
-#   Ctrl+B → z       Zoom into current pane (fullscreen toggle)
+#   Ctrl+B → z       Zoom into current pane (fullscreen / back to grid)
 #   Ctrl+B → arrow    Move between panes
 #   Ctrl+B → q        Show pane numbers, then press number to jump
 #   Ctrl+B → d        Detach (keeps running in background)
@@ -49,13 +49,6 @@ if tmux has-session -t "$SESSION" 2>/dev/null; then
   sleep 1
 fi
 
-# ─── Build env string for tmux ───────────────────────────────────────────────
-
-ENV_EXPORT="export DISCORD_BOT_TOKEN='$DISCORD_BOT_TOKEN'"
-if [ -n "$BRIDGE_SECRET" ]; then
-  ENV_EXPORT="$ENV_EXPORT; export BRIDGE_SECRET='$BRIDGE_SECRET'"
-fi
-
 # ─── Read channel list ──────────────────────────────────────────────────────
 
 CHANNELS=()
@@ -63,84 +56,91 @@ while IFS='|' read -r slug port channel_id name cwd; do
   CHANNELS+=("$slug|$port|$channel_id|$name|$cwd")
 done < <(node --input-type=module -e "
 import { readFileSync } from 'fs';
-const config = JSON.parse(readFileSync('$CONFIG', 'utf-8'));
+const config = JSON.parse(readFileSync(process.argv[1], 'utf-8'));
 for (const [id, info] of Object.entries(config.channels)) {
   console.log([info.slug, info.port, id, info.name, info.cwd].join('|'));
 }
-")
+" -- "$CONFIG")
 
 NUM_CHANNELS=${#CHANNELS[@]}
-TOTAL_PANES=$((NUM_CHANNELS + 1))  # channels + bot
+TOTAL_PANES=$((NUM_CHANNELS + 1))
 
 echo "Starting Claude Discord Bridge..."
 echo "  Channels: $NUM_CHANNELS"
 echo ""
 
-# ─── Create tmux session with split-pane dashboard ──────────────────────────
+# ─── Create tmux session ────────────────────────────────────────────────────
 
-# Calculate grid: aim for roughly square layout
-if [ "$TOTAL_PANES" -le 2 ]; then
-  COLS=2; ROWS=1
-elif [ "$TOTAL_PANES" -le 4 ]; then
-  COLS=2; ROWS=2
-elif [ "$TOTAL_PANES" -le 6 ]; then
-  COLS=3; ROWS=2
-elif [ "$TOTAL_PANES" -le 9 ]; then
-  COLS=3; ROWS=3
-else
-  COLS=4; ROWS=$(( (TOTAL_PANES + 3) / 4 ))
+# Pass env vars safely via tmux set-environment (no shell interpolation)
+tmux new-session -d -s "$SESSION" -n dashboard "sleep infinity"
+tmux set-environment -t "$SESSION" DISCORD_BOT_TOKEN "$DISCORD_BOT_TOKEN"
+if [ -n "$BRIDGE_SECRET" ]; then
+  tmux set-environment -t "$SESSION" BRIDGE_SECRET "$BRIDGE_SECRET"
 fi
 
-# Pane 0: first channel (created with the session)
+# Kill the placeholder and start first channel in pane 0
 IFS='|' read -r slug port channel_id name cwd <<< "${CHANNELS[0]}"
-echo "  #$name -> $cwd"
-
-tmux new-session -d -s "$SESSION" -n dashboard \
-  "$ENV_EXPORT; cd '$cwd' && claude --dangerously-load-development-channels server:discord-bridge; echo '[exited]'; read"
+echo "  #$name -> $cwd (port: $port)"
+tmux send-keys -t "$SESSION:dashboard.0" C-c
+tmux respawn-pane -t "$SESSION:dashboard.0" -k \
+  "cd $(printf '%q' "$cwd") && claude --dangerously-load-development-channels server:discord-bridge; echo '[exited]'; read"
 
 sleep 1
 
 # Remaining channels as split panes
 for ((i = 1; i < NUM_CHANNELS; i++)); do
   IFS='|' read -r slug port channel_id name cwd <<< "${CHANNELS[$i]}"
-  echo "  #$name -> $cwd"
+  echo "  #$name -> $cwd (port: $port)"
 
   tmux split-window -t "$SESSION:dashboard" \
-    "$ENV_EXPORT; cd '$cwd' && claude --dangerously-load-development-channels server:discord-bridge; echo '[exited]'; read"
+    "cd $(printf '%q' "$cwd") && claude --dangerously-load-development-channels server:discord-bridge; echo '[exited]'; read"
 
   sleep 1
 done
 
-# Bot pane (last pane, bottom-right)
+# Bot pane (last)
 tmux split-window -t "$SESSION:dashboard" \
-  "$ENV_EXPORT; cd '$BRIDGE_DIR' && node bot.js; echo '[bot exited]'; read"
+  "cd $(printf '%q' "$BRIDGE_DIR") && node bot.js; echo '[bot exited]'; read"
 
 sleep 1
 
 # Re-layout into even grid
 tmux select-layout -t "$SESSION:dashboard" tiled
 
-# ─── Style the panes ────────────────────────────────────────────────────────
+# ─── Pane titles with channel info ──────────────────────────────────────────
 
-# Set pane titles for identification
 PANE_IDX=0
 for ((i = 0; i < NUM_CHANNELS; i++)); do
   IFS='|' read -r slug port channel_id name cwd <<< "${CHANNELS[$i]}"
-  tmux select-pane -t "$SESSION:dashboard.$PANE_IDX" -T "#$name"
+  # Show: channel name → repo path (port)
+  short_cwd="${cwd/#$HOME/~}"
+  tmux select-pane -t "$SESSION:dashboard.$PANE_IDX" \
+    -T "#$name -> $short_cwd [:$port]"
   PANE_IDX=$((PANE_IDX + 1))
 done
-tmux select-pane -t "$SESSION:dashboard.$PANE_IDX" -T "Bot"
+tmux select-pane -t "$SESSION:dashboard.$PANE_IDX" \
+  -T "Bot ($NUM_CHANNELS channels)"
 
-# Enable pane border labels
+# Style
 tmux set-option -t "$SESSION" pane-border-status top
-tmux set-option -t "$SESSION" pane-border-format ' #{pane_title} '
+tmux set-option -t "$SESSION" pane-border-format \
+  ' #{?pane_active,#[fg=colour51 bold],#[fg=colour245]}#{pane_title}#[default] '
 tmux set-option -t "$SESSION" pane-border-style 'fg=colour240'
 tmux set-option -t "$SESSION" pane-active-border-style 'fg=colour51'
+
+# Status bar
+tmux set-option -t "$SESSION" status-style 'bg=colour235 fg=colour250'
+tmux set-option -t "$SESSION" status-left \
+  '#[fg=colour51 bold] BRIDGE #[fg=colour245]| '
+tmux set-option -t "$SESSION" status-right \
+  '#[fg=colour245]Ctrl+B z=zoom q=jump d=detach'
+tmux set-option -t "$SESSION" status-left-length 20
+tmux set-option -t "$SESSION" status-right-length 40
 
 # Select first pane
 tmux select-pane -t "$SESSION:dashboard.0"
 
-# ─── Open in new iTerm2 window ──────────────────────────────────────────────
+# ─── Open in new iTerm2 window (macOS) ──────────────────────────────────────
 
 if [ "$(uname)" = "Darwin" ] && command -v osascript &>/dev/null; then
   osascript -e "
@@ -148,7 +148,11 @@ if [ "$(uname)" = "Darwin" ] && command -v osascript &>/dev/null; then
       create window with default profile command \"tmux attach -t $SESSION\"
       activate
     end tell
-  " 2>/dev/null || tmux attach -t "$SESSION"
+  " 2>/dev/null || {
+    echo ""
+    echo "Claude Discord Bridge is running!"
+    echo "  Open: tmux attach -t $SESSION"
+  }
 else
   echo ""
   echo "Claude Discord Bridge is running!"
@@ -158,7 +162,7 @@ else
   echo "  Controls:"
   echo "    Ctrl+B -> z        Zoom in/out (fullscreen toggle)"
   echo "    Ctrl+B -> arrow    Move between panes"
-  echo "    Ctrl+B -> q        Show pane numbers"
+  echo "    Ctrl+B -> q        Show pane numbers, then press number"
   echo "    Ctrl+B -> d        Detach (keeps running)"
   echo ""
   echo "  Stop:  npm stop"
