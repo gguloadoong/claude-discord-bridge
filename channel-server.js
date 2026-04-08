@@ -109,6 +109,12 @@ const mcp = new Server(
       `Use edit_message to update a previous reply. Use react to add emoji reactions.`,
       `Use fetch_messages to read recent channel history.`,
       `Long messages are automatically split across multiple Discord messages.`,
+      ``,
+      `CRITICAL: The user is ONLY watching Discord, NOT the terminal.`,
+      `- NEVER ask questions or present choices in the terminal. ALWAYS use the reply tool to ask questions in Discord.`,
+      `- If you need the user to choose between options, send the options via reply tool and wait for their Discord response.`,
+      `- If you need clarification, ask via reply tool. Do NOT use interactive terminal prompts.`,
+      `- The user cannot see terminal output. Everything must go through Discord.`,
     ].join('\n'),
   },
 )
@@ -243,12 +249,35 @@ mcp.setNotificationHandler(PermissionRequestSchema, async ({ params }) => {
   const text = [
     `**[Permission Request]**`,
     `Tool: \`${params.tool_name}\``,
-    `Description: ${params.description}`,
-    '',
-    `Reply \`yes ${params.request_id}\` or \`no ${params.request_id}\``,
+    `${params.description}`,
   ].join('\n')
 
-  await discordSend(CHANNEL_ID, text)
+  // Send with Yes/No buttons
+  await discordFetch(`/channels/${CHANNEL_ID}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({
+      content: text,
+      components: [{
+        type: 1, // ActionRow
+        components: [
+          {
+            type: 2, // Button
+            style: 3, // Success (green)
+            label: 'Approve',
+            custom_id: `perm_yes_${params.request_id}_${PORT}`,
+            emoji: { name: '\u2705' },
+          },
+          {
+            type: 2,
+            style: 4, // Danger (red)
+            label: 'Deny',
+            custom_id: `perm_no_${params.request_id}_${PORT}`,
+            emoji: { name: '\u274C' },
+          },
+        ],
+      }],
+    }),
+  })
 })
 
 // ─── Connect MCP ────────────────────────────────────────────────────────────

@@ -135,7 +135,7 @@ tmux set-option -t "$SESSION" status on
 tmux set-option -t "$SESSION" status-interval 5
 tmux set-option -t "$SESSION" status-style 'bg=colour233 fg=colour250'
 tmux set-option -t "$SESSION" status-left \
-  '#[bg=colour25 fg=colour255 bold]  BRIDGE #[bg=colour233 fg=colour245] ${NUM_CHANNELS} channels '
+  "#[bg=colour25 fg=colour255 bold]  BRIDGE #[bg=colour233 fg=colour245] ${NUM_CHANNELS} channels "
 tmux set-option -t "$SESSION" status-left-length 30
 tmux set-option -t "$SESSION" status-right \
   '#[fg=colour245]%H:%M #[fg=colour238]| #[fg=colour245]z=zoom q=jump d=detach #[fg=colour238]| #[fg=colour214]localhost:8800'

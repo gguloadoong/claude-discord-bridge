@@ -193,6 +193,48 @@ client.on(Events.MessageCreate, async (message) => {
   }
 })
 
+// ─── Button interactions (permission approve/deny) ──────────────────────────
+
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isButton()) return
+
+  const customId = interaction.customId
+  // Format: perm_yes_<requestId>_<port> or perm_no_<requestId>_<port>
+  const match = customId.match(/^perm_(yes|no)_([a-km-z]{5})_(\d+)$/)
+  if (!match) return
+
+  const [, verdict, requestId, port] = match
+  const behavior = verdict === 'yes' ? 'allow' : 'deny'
+
+  try {
+    await fetch(`http://127.0.0.1:${port}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(SHARED_SECRET && { 'X-Bridge-Secret': SHARED_SECRET }),
+      },
+      body: JSON.stringify({
+        content: `${verdict} ${requestId}`,
+        channel_id: interaction.channelId,
+        message_id: interaction.message.id,
+        user: interaction.user.displayName || interaction.user.username,
+        user_id: interaction.user.id,
+      }),
+      signal: AbortSignal.timeout(5_000),
+    })
+
+    const label = behavior === 'allow' ? 'Approved' : 'Denied'
+    const emoji = behavior === 'allow' ? '\u2705' : '\u274C'
+    await interaction.update({
+      content: `${interaction.message.content}\n\n${emoji} **${label}** by ${interaction.user.displayName || interaction.user.username}`,
+      components: [], // Remove buttons after click
+    })
+  } catch (err) {
+    console.error(`[bot] Permission button error:`, err.message)
+    await interaction.reply({ content: 'Failed to process. Try typing the command manually.', ephemeral: true }).catch(() => {})
+  }
+})
+
 // ─── Graceful shutdown ──────────────────────────────────────────────────────
 
 function shutdown() {
