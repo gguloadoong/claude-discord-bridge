@@ -33,6 +33,37 @@ if (!BOT_TOKEN) {
 }
 
 const SHARED_SECRET = process.env.BRIDGE_SECRET || ''
+const DASHBOARD_PORT = parseInt(process.env.DASHBOARD_PORT || '8800')
+
+// ─── Dashboard state ────────────────────────────────────────────────────────
+
+const channelActivity = new Map()
+const recentMessages = [] // rolling buffer, max 50
+const MAX_RECENT = 50
+
+function recordMessage(channelId, user, content) {
+  const entry = channelActivity.get(channelId) || { messagesToday: 0, errors: 0 }
+  entry.lastMessage = { user, preview: content.slice(0, 80), time: Date.now() }
+  entry.messagesToday++
+  channelActivity.set(channelId, entry)
+
+  const info = channelMap.get(channelId)
+  recentMessages.unshift({
+    channel: info?.name || channelId,
+    slug: info?.slug || 'unknown',
+    user,
+    preview: content.slice(0, 80),
+    time: Date.now(),
+  })
+  if (recentMessages.length > MAX_RECENT) recentMessages.length = MAX_RECENT
+}
+
+function recordError(channelId) {
+  const entry = channelActivity.get(channelId) || { messagesToday: 0, errors: 0 }
+  entry.errors++
+  entry.lastError = Date.now()
+  channelActivity.set(channelId, entry)
+}
 
 // Build channel ID → config mapping
 const channelMap = new Map()
@@ -152,9 +183,11 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   try {
+    recordMessage(message.channelId, payload.user, payload.content)
     await postWithRetry(`http://127.0.0.1:${target.port}`, payload)
     await message.react('\u{1F440}') // 👀
   } catch (err) {
+    recordError(message.channelId)
     console.error(`[bot] ${target.name} delivery failed:`, err.message)
     await message.react('\u274C').catch(() => {}) // ❌
   }
@@ -170,5 +203,59 @@ function shutdown() {
 
 process.on('SIGINT', shutdown)
 process.on('SIGTERM', shutdown)
+
+// ─── Dashboard HTTP server ──────────────────────────────────────────────────
+
+import { createServer } from 'node:http'
+
+const dashboardServer = createServer(async (req, res) => {
+  if (req.url === '/api/status') {
+    const channels = []
+    for (const [id, info] of channelMap) {
+      const activity = channelActivity.get(id) || {}
+      channels.push({
+        id,
+        name: info.name,
+        slug: info.slug,
+        port: info.port,
+        online: serverHealth.get(id) !== false,
+        lastMessage: activity.lastMessage || null,
+        messagesToday: activity.messagesToday || 0,
+        errors: activity.errors || 0,
+        lastError: activity.lastError || null,
+      })
+    }
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+    })
+    res.end(JSON.stringify({
+      channels,
+      recentMessages: recentMessages.slice(0, 30),
+      uptime: process.uptime(),
+      timestamp: Date.now(),
+    }))
+    return
+  }
+
+  if (req.url === '/' || req.url === '/dashboard') {
+    try {
+      const html = readFileSync(join(__dirname, 'dashboard.html'), 'utf-8')
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+      res.end(html)
+    } catch {
+      res.writeHead(500)
+      res.end('dashboard.html not found')
+    }
+    return
+  }
+
+  res.writeHead(404)
+  res.end()
+})
+
+dashboardServer.listen(DASHBOARD_PORT, '127.0.0.1', () => {
+  console.log(`[bot] Dashboard: http://127.0.0.1:${DASHBOARD_PORT}`)
+})
 
 client.login(BOT_TOKEN)

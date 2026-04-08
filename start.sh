@@ -71,19 +71,19 @@ echo ""
 
 # ─── Create tmux session ────────────────────────────────────────────────────
 
-# Pass env vars safely via tmux set-environment (no shell interpolation)
-tmux new-session -d -s "$SESSION" -n dashboard "sleep infinity"
+# First channel creates the session
+IFS='|' read -r slug port channel_id name cwd <<< "${CHANNELS[0]}"
+echo "  #$name -> $cwd (port: $port)"
+
+ESCAPED_CWD=$(printf '%q' "$cwd")
+tmux new-session -d -s "$SESSION" -n dashboard \
+  "export DISCORD_BOT_TOKEN=$(printf '%q' "$DISCORD_BOT_TOKEN"); [ -n \"$BRIDGE_SECRET\" ] && export BRIDGE_SECRET=$(printf '%q' "$BRIDGE_SECRET"); cd $ESCAPED_CWD && claude --dangerously-load-development-channels server:discord-bridge; echo '[exited]'; read"
+
+# Set env for subsequent panes
 tmux set-environment -t "$SESSION" DISCORD_BOT_TOKEN "$DISCORD_BOT_TOKEN"
 if [ -n "$BRIDGE_SECRET" ]; then
   tmux set-environment -t "$SESSION" BRIDGE_SECRET "$BRIDGE_SECRET"
 fi
-
-# Kill the placeholder and start first channel in pane 0
-IFS='|' read -r slug port channel_id name cwd <<< "${CHANNELS[0]}"
-echo "  #$name -> $cwd (port: $port)"
-tmux send-keys -t "$SESSION:dashboard.0" C-c
-tmux respawn-pane -t "$SESSION:dashboard.0" -k \
-  "cd $(printf '%q' "$cwd") && claude --dangerously-load-development-channels server:discord-bridge; echo '[exited]'; read"
 
 sleep 1
 
@@ -110,32 +110,40 @@ tmux select-layout -t "$SESSION:dashboard" tiled
 # ─── Pane titles with channel info ──────────────────────────────────────────
 
 PANE_IDX=0
+ICONS=("📊" "🎬" "🏠" "📂" "📂" "📂" "📂" "📂")
 for ((i = 0; i < NUM_CHANNELS; i++)); do
   IFS='|' read -r slug port channel_id name cwd <<< "${CHANNELS[$i]}"
-  # Show: channel name → repo path (port)
   short_cwd="${cwd/#$HOME/~}"
   tmux select-pane -t "$SESSION:dashboard.$PANE_IDX" \
-    -T "#$name -> $short_cwd [:$port]"
+    -T "${ICONS[$i]} $name  $short_cwd [:$port]"
   PANE_IDX=$((PANE_IDX + 1))
 done
 tmux select-pane -t "$SESSION:dashboard.$PANE_IDX" \
-  -T "Bot ($NUM_CHANNELS channels)"
+  -T "🤖 Bot ($NUM_CHANNELS channels)"
 
-# Style
+# ─── War Room Styling ──────────────────────────────────────────────────────
+
+# Pane borders with dead-process detection
 tmux set-option -t "$SESSION" pane-border-status top
 tmux set-option -t "$SESSION" pane-border-format \
-  ' #{?pane_active,#[fg=colour51 bold],#[fg=colour245]}#{pane_title}#[default] '
-tmux set-option -t "$SESSION" pane-border-style 'fg=colour240'
-tmux set-option -t "$SESSION" pane-active-border-style 'fg=colour51'
+  ' #{?pane_active,#[bg=colour25 fg=colour255 bold],#[fg=colour245]} #{pane_title} #[default]#{?pane_dead,#[fg=colour196] DEAD,} '
+tmux set-option -t "$SESSION" pane-border-style 'fg=colour238'
+tmux set-option -t "$SESSION" pane-active-border-style 'fg=colour39'
 
 # Status bar
-tmux set-option -t "$SESSION" status-style 'bg=colour235 fg=colour250'
+tmux set-option -t "$SESSION" status on
+tmux set-option -t "$SESSION" status-interval 5
+tmux set-option -t "$SESSION" status-style 'bg=colour233 fg=colour250'
 tmux set-option -t "$SESSION" status-left \
-  '#[fg=colour51 bold] BRIDGE #[fg=colour245]| '
+  '#[bg=colour25 fg=colour255 bold]  BRIDGE #[bg=colour233 fg=colour245] ${NUM_CHANNELS} channels '
+tmux set-option -t "$SESSION" status-left-length 30
 tmux set-option -t "$SESSION" status-right \
-  '#[fg=colour245]Ctrl+B z=zoom q=jump d=detach'
-tmux set-option -t "$SESSION" status-left-length 20
-tmux set-option -t "$SESSION" status-right-length 40
+  '#[fg=colour245]%H:%M #[fg=colour238]| #[fg=colour245]z=zoom q=jump d=detach #[fg=colour238]| #[fg=colour214]localhost:8800'
+tmux set-option -t "$SESSION" status-right-length 55
+
+# Window title (shows in macOS window bar)
+tmux set-option -t "$SESSION" set-titles on
+tmux set-option -t "$SESSION" set-titles-string 'Claude Bridge'
 
 # Select first pane
 tmux select-pane -t "$SESSION:dashboard.0"
