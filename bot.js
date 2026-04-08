@@ -276,6 +276,7 @@ const dashboardServer = createServer(async (req, res) => {
       recentMessages: recentMessages.slice(0, 30),
       uptime: process.uptime(),
       timestamp: Date.now(),
+      guildId: config.guild_id || '',
     }))
     return
   }

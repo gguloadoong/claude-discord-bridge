@@ -6,167 +6,113 @@
 <title>Claude Bridge Control Room</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #0f1117;
-    color: #e1e4e8;
-    min-height: 100vh;
-  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e1e4e8; min-height: 100vh; }
 
-  .header {
-    background: #161b22;
-    border-bottom: 1px solid #30363d;
-    padding: 16px 24px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .header h1 { font-size: 18px; font-weight: 600; color: #58a6ff; }
+  .header { background: #161b22; border-bottom: 1px solid #30363d; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; }
+  .header h1 { font-size: 17px; font-weight: 600; color: #58a6ff; }
   .header-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: #8b949e; }
   .global-status { display: flex; align-items: center; gap: 6px; font-weight: 500; }
 
-  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
   .dot.green { background: #3fb950; box-shadow: 0 0 6px #3fb95080; }
   .dot.yellow { background: #d29922; box-shadow: 0 0 6px #d2992280; }
   .dot.red { background: #f85149; box-shadow: 0 0 6px #f8514980; }
   .dot.grey { background: #484f58; }
   .dot.blue { background: #58a6ff; box-shadow: 0 0 6px #58a6ff80; }
 
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; padding: 24px; }
-  .card {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 12px;
-    padding: 20px;
-    transition: border-color 0.2s;
-    position: relative;
-    overflow: hidden;
-  }
-  .card:hover { border-color: #58a6ff40; }
+  /* Alerts */
+  .alerts { padding: 12px 24px 0; display: flex; flex-direction: column; gap: 8px; }
+  .alert { padding: 10px 16px; border-radius: 8px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .alert.red { background: #2d1b1b; border: 1px solid #f8514940; color: #f85149; }
+  .alert.yellow { background: #2d2600; border: 1px solid #d2992240; color: #d29922; }
+  .alert-icon { font-size: 16px; }
+  .alert-text { flex: 1; }
+  .alerts:empty { display: none; padding: 0; }
+
+  /* Cards */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; padding: 16px 24px; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 18px; position: relative; }
+  .card:hover { border-color: #58a6ff30; }
   .card.working { border-left: 3px solid #58a6ff; }
+  .card.thinking { border-left: 3px solid #d29922; }
   .card.idle { border-left: 3px solid #30363d; }
-  .card.offline { border-left: 3px solid #484f58; opacity: 0.6; }
+  .card.offline { border-left: 3px solid #f85149; opacity: 0.6; }
 
-  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-  .card-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-  .card-icon { font-size: 20px; }
+  .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .card-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .card-title a { color: inherit; text-decoration: none; }
+  .card-title a:hover { color: #58a6ff; }
+  .card-icon { font-size: 18px; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+  .badge.working { background: #1f3a5f; color: #58a6ff; }
+  .badge.thinking { background: #3b2e00; color: #d29922; }
+  .badge.idle { background: #1c2128; color: #8b949e; }
+  .badge.offline { background: #2d1b1b; color: #f85149; }
 
-  .status-badge { font-size: 11px; padding: 3px 10px; border-radius: 10px; font-weight: 500; }
-  .status-badge.working { background: #1f3a5f; color: #58a6ff; }
-  .status-badge.thinking { background: #3b2e00; color: #d29922; }
-  .status-badge.idle { background: #1c2128; color: #8b949e; }
-  .status-badge.offline { background: #2d1b1b; color: #f85149; }
+  /* Current task */
+  .task-box { background: #0d1117; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+  .task-label { font-size: 10px; color: #484f58; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .task-text { font-size: 13px; color: #c9d1d9; line-height: 1.4; }
+  .task-meta { font-size: 11px; color: #484f58; margin-top: 4px; display: flex; gap: 12px; }
+  .task-text.dim { color: #484f58; }
 
-  .card-body { display: flex; flex-direction: column; gap: 12px; }
+  /* Agent/Tool row */
+  .agent-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .tag { font-size: 11px; padding: 2px 7px; border-radius: 5px; display: inline-flex; align-items: center; gap: 3px; }
+  .tag.agent { background: #1f3a5f; color: #58a6ff; }
+  .tag.tool { background: #1c2128; color: #8b949e; }
+  .tag.branch { background: #1a2332; color: #79c0ff; }
 
-  .info-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: #8b949e;
-  }
-  .info-label { min-width: 50px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #484f58; }
-  .info-value { color: #c9d1d9; }
-  .info-value.highlight { color: #58a6ff; font-weight: 500; }
-  .info-value.warn { color: #d29922; }
-
-  .agent-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: #1f3a5f;
-    color: #58a6ff;
-    padding: 2px 8px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 500;
-  }
-  .tool-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: #1c2128;
-    color: #8b949e;
-    padding: 2px 8px;
-    border-radius: 6px;
-    font-size: 12px;
-  }
-
-  .actions-list {
-    background: #0d1117;
-    border-radius: 8px;
-    padding: 8px 12px;
-    max-height: 80px;
-    overflow-y: auto;
-  }
-  .actions-list::-webkit-scrollbar { width: 4px; }
-  .actions-list::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
-  .action-item {
-    font-size: 12px;
-    color: #8b949e;
-    padding: 2px 0;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .action-icon { font-size: 10px; color: #484f58; }
-
-  .last-request {
-    background: #0d1117;
-    border-radius: 8px;
-    padding: 10px 12px;
-  }
-  .last-request-label { font-size: 11px; color: #484f58; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .last-request-text { font-size: 13px; color: #c9d1d9; line-height: 1.4; }
-  .last-request-meta { font-size: 11px; color: #484f58; margin-top: 4px; }
-
-  .stats-row {
-    display: flex;
-    gap: 12px;
-  }
-  .stat-mini {
-    background: #0d1117;
-    border-radius: 8px;
-    padding: 8px 12px;
-    flex: 1;
-    text-align: center;
-  }
-  .stat-mini-value { font-size: 18px; font-weight: 700; }
-  .stat-mini-label { font-size: 10px; color: #484f58; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
-  .stat-mini-value.error { color: #f85149; }
+  /* Stats */
+  .stats { display: flex; gap: 8px; margin-bottom: 10px; }
+  .stat { background: #0d1117; border-radius: 6px; padding: 6px 10px; flex: 1; text-align: center; }
+  .stat-val { font-size: 16px; font-weight: 700; }
+  .stat-lbl { font-size: 9px; color: #484f58; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px; }
+  .stat-val.err { color: #f85149; }
 
   /* Context bar */
-  .ctx-bar { width: 100%; height: 4px; background: #21262d; border-radius: 2px; margin-top: 4px; }
+  .ctx-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 11px; color: #484f58; }
+  .ctx-bar { flex: 1; height: 4px; background: #21262d; border-radius: 2px; }
   .ctx-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
   .ctx-fill.low { background: #3fb950; }
   .ctx-fill.mid { background: #d29922; }
   .ctx-fill.high { background: #f85149; }
 
-  /* Timeline */
-  .timeline-section { padding: 0 24px 24px; }
-  .timeline-header {
-    font-size: 14px; font-weight: 600; color: #8b949e;
-    margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #21262d;
-  }
-  .timeline {
-    background: #161b22; border: 1px solid #30363d; border-radius: 12px;
-    overflow: hidden; max-height: 300px; overflow-y: auto;
-  }
-  .timeline::-webkit-scrollbar { width: 6px; }
-  .timeline::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
-  .timeline-item {
-    padding: 8px 16px; border-bottom: 1px solid #21262d;
-    display: flex; align-items: center; gap: 10px; font-size: 13px;
-  }
-  .timeline-item:hover { background: #1c2128; }
-  .timeline-item:last-child { border-bottom: none; }
-  .timeline-time { color: #484f58; font-size: 12px; min-width: 45px; }
-  .timeline-channel { font-weight: 600; min-width: 80px; }
-  .timeline-user { color: #58a6ff; }
-  .timeline-text { color: #8b949e; flex: 1; }
+  /* Git progress */
+  .git-section { margin-bottom: 6px; }
+  .git-header { font-size: 10px; color: #484f58; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .git-item { font-size: 12px; color: #8b949e; padding: 2px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .git-item .gi { font-size: 11px; flex-shrink: 0; }
+  .pr-badge { font-size: 10px; padding: 1px 5px; border-radius: 4px; }
+  .pr-badge.open { background: #1a4d2e; color: #3fb950; }
+  .pr-badge.merged { background: #2a1a4d; color: #a371f7; }
 
-  .empty-state { text-align: center; padding: 30px; color: #484f58; font-size: 14px; }
+  /* Bottom sections */
+  .bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 24px 24px; }
+  @media (max-width: 900px) { .bottom { grid-template-columns: 1fr; } }
+
+  .section { background: #161b22; border: 1px solid #30363d; border-radius: 12px; overflow: hidden; }
+  .section-hdr { font-size: 13px; font-weight: 600; color: #8b949e; padding: 12px 16px; border-bottom: 1px solid #21262d; }
+  .section-body { max-height: 280px; overflow-y: auto; }
+  .section-body::-webkit-scrollbar { width: 5px; }
+  .section-body::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+
+  /* Timeline */
+  .tl-item { padding: 8px 16px; border-bottom: 1px solid #21262d; display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .tl-item:last-child { border-bottom: none; }
+  .tl-item:hover { background: #1c2128; }
+  .tl-time { color: #484f58; min-width: 40px; }
+  .tl-ch { font-weight: 600; min-width: 70px; }
+  .tl-user { color: #58a6ff; min-width: 40px; }
+  .tl-text { color: #8b949e; flex: 1; }
+
+  /* Completed work */
+  .done-item { padding: 8px 16px; border-bottom: 1px solid #21262d; font-size: 12px; }
+  .done-item:last-child { border-bottom: none; }
+  .done-title { color: #c9d1d9; }
+  .done-meta { color: #484f58; font-size: 11px; margin-top: 2px; }
+
+  .empty { text-align: center; padding: 24px; color: #484f58; font-size: 13px; }
 
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
   .pulse { animation: pulse 2s ease-in-out infinite; }
@@ -179,174 +125,201 @@
   <div class="header-right">
     <span id="uptime">--</span>
     <div class="global-status">
-      <span class="dot grey" id="global-dot"></span>
-      <span id="global-text">Loading...</span>
+      <span class="dot grey" id="gdot"></span>
+      <span id="gtxt">Loading...</span>
     </div>
   </div>
 </div>
 
+<div class="alerts" id="alerts"></div>
 <div class="cards" id="cards"></div>
 
-<div class="timeline-section">
-  <div class="timeline-header">Recent Activity</div>
-  <div class="timeline" id="timeline">
-    <div class="empty-state">Waiting for messages...</div>
+<div class="bottom">
+  <div class="section">
+    <div class="section-hdr">Recent Messages</div>
+    <div class="section-body" id="timeline"></div>
+  </div>
+  <div class="section">
+    <div class="section-hdr">Completed Work</div>
+    <div class="section-body" id="completed"></div>
   </div>
 </div>
 
 <script>
 const ICONS = { market: '\u{1F4CA}', shorts: '\u{1F3AC}', general: '\u{1F3E0}' }
-const TOOL_ICONS = {
-  Bash: '\u{1F4BB}', Read: '\u{1F4D6}', Edit: '\u270F\uFE0F', Write: '\u{1F4DD}',
-  Grep: '\u{1F50D}', Glob: '\u{1F4C2}', Skill: '\u26A1', Reply: '\u{1F4AC}',
-}
-const STATE_LABELS = {
-  working: 'Working', thinking: 'Thinking', idle: 'Idle', offline: 'Offline',
-}
+const GUILD = null // filled from API
+const STATE_KR = { working: '작업중', thinking: '생각중', idle: '대기', offline: '오프라인' }
 
-let monitorData = {}
-let statusData = { channels: [], recentMessages: [], uptime: 0 }
+let mon = {}, status = { channels: [], recentMessages: [], uptime: 0 }
 
 function timeAgo(ts) {
   if (!ts) return ''
-  const sec = Math.floor((Date.now() - ts) / 1000)
-  if (sec < 10) return 'just now'
-  if (sec < 60) return sec + 's ago'
-  const min = Math.floor(sec / 60)
-  if (min < 60) return min + 'm ago'
-  const hr = Math.floor(min / 60)
-  return hr + 'h ago'
+  const s = Math.floor((Date.now() - ts) / 1000)
+  if (s < 10) return '방금'
+  if (s < 60) return s + '초 전'
+  const m = Math.floor(s / 60)
+  if (m < 60) return m + '분 전'
+  return Math.floor(m / 60) + '시간 전'
 }
+function hm(ts) { const d = new Date(ts); return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0') }
+function uptime(s) { return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm' }
 
-function formatUptime(sec) {
-  const h = Math.floor(sec / 3600)
-  const m = Math.floor((sec % 3600) / 60)
-  return 'Uptime: ' + h + 'h ' + m + 'm'
-}
-
-function formatTime(ts) {
-  const d = new Date(ts)
-  return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0')
+function renderAlerts() {
+  const el = document.getElementById('alerts')
+  const alerts = []
+  status.channels.forEach(ch => {
+    const m = mon[ch.slug] || {}
+    if (!ch.online) alerts.push({ level: 'red', icon: '\u{1F6A8}', text: ch.name + ' 서버 오프라인' })
+    if (m.context > 80) alerts.push({ level: 'yellow', icon: '\u26A0\uFE0F', text: ch.name + ' 컨텍스트 ' + m.context + '% — 세션 재시작 필요할 수 있음' })
+    if (ch.errors > 3) alerts.push({ level: 'yellow', icon: '\u{1F4A5}', text: ch.name + ' 에러 ' + ch.errors + '건 발생' })
+  })
+  el.innerHTML = alerts.map(a =>
+    '<div class="alert ' + a.level + '"><span class="alert-icon">' + a.icon + '</span><span class="alert-text">' + a.text + '</span></div>'
+  ).join('')
 }
 
 function renderCards() {
-  const container = document.getElementById('cards')
-  container.innerHTML = statusData.channels.map(ch => {
+  const el = document.getElementById('cards')
+  el.innerHTML = status.channels.map(ch => {
+    const m = mon[ch.slug] || {}
+    const gh = m.github || null
     const icon = ICONS[ch.slug] || '\u{1F4C2}'
-    const mon = monitorData[ch.slug] || {}
-    const state = !ch.online ? 'offline' : (mon.state || 'idle')
-    const stateLabel = STATE_LABELS[state] || state
-    const cardClass = state === 'offline' ? 'offline' : (state === 'idle' ? 'idle' : 'working')
-    const statePulse = (state === 'working' || state === 'thinking') ? 'pulse' : ''
+    const st = !ch.online ? 'offline' : (m.state || 'idle')
+    const stKr = STATE_KR[st] || st
+    const p = (st === 'working' || st === 'thinking') ? ' pulse' : ''
 
-    // Agent info
-    let agentHtml = ''
-    if (mon.agent) {
-      agentHtml = '<div class="info-row"><span class="info-label">Agent</span><span class="agent-badge">' + mon.agent + '</span></div>'
+    // Discord deep link
+    const guildId = status.guildId || ''
+    const discordLink = guildId ? 'https://discord.com/channels/' + guildId + '/' + ch.id : '#'
+
+    // Current task
+    let taskHtml
+    if (ch.lastMessage && (st === 'working' || st === 'thinking')) {
+      const elapsed = timeAgo(ch.lastMessage.time)
+      taskHtml = '<div class="task-box"><div class="task-label">현재 작업</div>' +
+        '<div class="task-text">"' + ch.lastMessage.preview + '"</div>' +
+        '<div class="task-meta"><span>' + ch.lastMessage.user + '</span><span>' + elapsed + ' 시작</span></div></div>'
+    } else if (ch.lastMessage) {
+      taskHtml = '<div class="task-box"><div class="task-label">마지막 요청</div>' +
+        '<div class="task-text dim">"' + ch.lastMessage.preview + '"</div>' +
+        '<div class="task-meta"><span>' + ch.lastMessage.user + '</span><span>' + timeAgo(ch.lastMessage.time) + '</span></div></div>'
+    } else {
+      taskHtml = '<div class="task-box"><div class="task-label">마지막 요청</div><div class="task-text dim">아직 없음</div></div>'
     }
 
-    // Tool info
-    let toolHtml = ''
-    if (mon.tool) {
-      const toolIcon = TOOL_ICONS[mon.tool] || '\u{1F527}'
-      const detail = mon.toolDetail ? ': ' + mon.toolDetail.slice(0, 40) : ''
-      toolHtml = '<div class="info-row"><span class="info-label">Tool</span><span class="tool-badge">' + toolIcon + ' ' + mon.tool + detail + '</span></div>'
-    }
+    // Agent/tool tags
+    let tags = ''
+    if (m.agent) tags += '<span class="tag agent">' + m.agent + '</span>'
+    if (m.tool) tags += '<span class="tag tool">' + m.tool + (m.toolDetail ? ': ' + m.toolDetail.slice(0,30) : '') + '</span>'
+    if (gh && gh.branch && gh.branch !== 'main') tags += '<span class="tag branch">\u{1F33F} ' + gh.branch + '</span>'
+    const agentHtml = tags ? '<div class="agent-row">' + tags + '</div>' : ''
+
+    // Stats
+    const statsHtml = '<div class="stats">' +
+      '<div class="stat"><div class="stat-val">' + ch.messagesToday + '</div><div class="stat-lbl">메시지</div></div>' +
+      '<div class="stat"><div class="stat-val' + (ch.errors > 0 ? ' err' : '') + '">' + ch.errors + '</div><div class="stat-lbl">에러</div></div>' +
+      (gh ? '<div class="stat"><div class="stat-val">' + gh.commitsToday + '</div><div class="stat-lbl">커밋</div></div>' : '') +
+      (gh ? '<div class="stat"><div class="stat-val">' + gh.openPRs.length + '</div><div class="stat-lbl">PR</div></div>' : '') +
+      (gh ? '<div class="stat"><div class="stat-val">' + gh.openIssues.length + '</div><div class="stat-lbl">이슈</div></div>' : '') +
+    '</div>'
 
     // Context bar
     let ctxHtml = ''
-    if (mon.context != null) {
-      const ctxClass = mon.context < 50 ? 'low' : mon.context < 80 ? 'mid' : 'high'
-      ctxHtml = '<div class="info-row"><span class="info-label">CTX</span><span class="info-value">' + mon.context + '%</span></div>' +
-        '<div class="ctx-bar"><div class="ctx-fill ' + ctxClass + '" style="width:' + mon.context + '%"></div></div>'
+    if (m.context != null) {
+      const cls = m.context < 50 ? 'low' : m.context < 80 ? 'mid' : 'high'
+      ctxHtml = '<div class="ctx-row">CTX ' + m.context + '%' +
+        (m.session ? ' · 세션 ' + m.session : '') +
+        '<div class="ctx-bar"><div class="ctx-fill ' + cls + '" style="width:' + m.context + '%"></div></div></div>'
     }
 
-    // Session
-    let sessionHtml = ''
-    if (mon.session) {
-      sessionHtml = '<div class="info-row"><span class="info-label">Session</span><span class="info-value">' + mon.session + '</span></div>'
-    }
-
-    // Last request
-    let lastReqHtml = '<div class="last-request"><div class="last-request-label">Last Request</div><div class="last-request-text" style="color:#484f58">No messages yet</div></div>'
-    if (ch.lastMessage) {
-      lastReqHtml = '<div class="last-request">' +
-        '<div class="last-request-label">Last Request</div>' +
-        '<div class="last-request-text">"' + ch.lastMessage.preview + '"</div>' +
-        '<div class="last-request-meta">' + ch.lastMessage.user + ' · ' + timeAgo(ch.lastMessage.time) + '</div>' +
+    // Recent commits
+    let commitsHtml = ''
+    if (gh && gh.recentCommits && gh.recentCommits.length > 0) {
+      commitsHtml = '<div class="git-section"><div class="git-header">오늘 작업 내역</div>' +
+        gh.recentCommits.slice(0, 3).map(c => '<div class="git-item"><span class="gi">\u2022</span>' + c + '</div>').join('') +
       '</div>'
     }
 
-    return '<div class="card ' + cardClass + '">' +
-      '<div class="card-header">' +
-        '<div class="card-title"><span class="card-icon">' + icon + '</span>' + ch.name + '</div>' +
-        '<span class="status-badge ' + state + ' ' + statePulse + '">' + stateLabel + '</span>' +
+    // Open PRs
+    let prHtml = ''
+    if (gh && gh.openPRs && gh.openPRs.length > 0) {
+      prHtml = '<div class="git-section"><div class="git-header">진행중 PR</div>' +
+        gh.openPRs.slice(0, 3).map(pr => '<div class="git-item"><span class="pr-badge open">PR #' + pr.number + '</span>' + pr.title + '</div>').join('') +
+      '</div>'
+    }
+
+    return '<div class="card ' + st + '">' +
+      '<div class="card-top">' +
+        '<div class="card-title"><span class="card-icon">' + icon + '</span><a href="' + discordLink + '" target="_blank">' + ch.name + '</a></div>' +
+        '<span class="badge ' + st + p + '">' + stKr + '</span>' +
       '</div>' +
-      '<div class="card-body">' +
-        agentHtml +
-        toolHtml +
-        sessionHtml +
-        ctxHtml +
-        '<div class="stats-row">' +
-          '<div class="stat-mini"><div class="stat-mini-value">' + ch.messagesToday + '</div><div class="stat-mini-label">Messages</div></div>' +
-          '<div class="stat-mini"><div class="stat-mini-value ' + (ch.errors > 0 ? 'error' : '') + '">' + ch.errors + '</div><div class="stat-mini-label">Errors</div></div>' +
-        '</div>' +
-        lastReqHtml +
-      '</div>' +
+      taskHtml + agentHtml + statsHtml + ctxHtml + commitsHtml + prHtml +
     '</div>'
   }).join('')
 }
 
 function renderTimeline() {
-  const container = document.getElementById('timeline')
-  const msgs = statusData.recentMessages
-  if (!msgs || msgs.length === 0) {
-    container.innerHTML = '<div class="empty-state">Waiting for messages...</div>'
-    return
-  }
-  container.innerHTML = msgs.map(m => {
+  const el = document.getElementById('timeline')
+  const msgs = status.recentMessages
+  if (!msgs || !msgs.length) { el.innerHTML = '<div class="empty">메시지 대기중...</div>'; return }
+  el.innerHTML = msgs.map(m => {
     const icon = ICONS[m.slug] || '\u{1F4C2}'
-    return '<div class="timeline-item">' +
-      '<span class="timeline-time">' + formatTime(m.time) + '</span>' +
-      '<span class="timeline-channel">' + icon + ' ' + m.channel + '</span>' +
-      '<span class="timeline-user">' + m.user + '</span>' +
-      '<span class="timeline-text">' + m.preview + '</span>' +
-    '</div>'
+    return '<div class="tl-item">' +
+      '<span class="tl-time">' + hm(m.time) + '</span>' +
+      '<span class="tl-ch">' + icon + ' ' + m.channel + '</span>' +
+      '<span class="tl-user">' + m.user + '</span>' +
+      '<span class="tl-text">' + m.preview + '</span></div>'
   }).join('')
 }
 
+function renderCompleted() {
+  const el = document.getElementById('completed')
+  const items = []
+  for (const slug in mon) {
+    const gh = mon[slug]?.github
+    if (!gh || !gh.mergedPRs) continue
+    gh.mergedPRs.forEach(pr => {
+      items.push({ name: mon[slug].name, icon: ICONS[slug] || '\u{1F4C2}', ...pr })
+    })
+  }
+  items.sort((a, b) => new Date(b.mergedAt) - new Date(a.mergedAt))
+  if (!items.length) { el.innerHTML = '<div class="empty">완료된 PR 없음</div>'; return }
+  el.innerHTML = items.slice(0, 10).map(it =>
+    '<div class="done-item"><div class="done-title">' + it.icon + ' <span class="pr-badge merged">PR #' + it.number + '</span> ' + it.title + '</div>' +
+    '<div class="done-meta">' + it.name + ' · ' + timeAgo(new Date(it.mergedAt).getTime()) + '</div></div>'
+  ).join('')
+}
+
 function updateGlobal() {
-  const dot = document.getElementById('global-dot')
-  const text = document.getElementById('global-text')
-  const chs = statusData.channels
-  const online = chs.filter(c => c.online).length
-  const working = Object.values(monitorData).filter(m => m.state === 'working' || m.state === 'thinking').length
-
-  if (online === 0) { dot.className = 'dot red'; text.textContent = 'All Offline'; }
-  else if (working > 0) { dot.className = 'dot blue pulse'; text.textContent = working + ' Working'; }
-  else if (online === chs.length) { dot.className = 'dot green'; text.textContent = 'All Online'; }
-  else { dot.className = 'dot yellow'; text.textContent = online + '/' + chs.length + ' Online'; }
-
-  document.getElementById('uptime').textContent = formatUptime(statusData.uptime)
+  const dot = document.getElementById('gdot'), txt = document.getElementById('gtxt')
+  const chs = status.channels
+  const on = chs.filter(c => c.online).length
+  const wrk = Object.values(mon).filter(m => m.state === 'working' || m.state === 'thinking').length
+  if (on === 0) { dot.className = 'dot red'; txt.textContent = '전체 오프라인' }
+  else if (wrk > 0) { dot.className = 'dot blue pulse'; txt.textContent = wrk + '개 작업중' }
+  else if (on === chs.length) { dot.className = 'dot green'; txt.textContent = '전체 온라인' }
+  else { dot.className = 'dot yellow'; txt.textContent = on + '/' + chs.length + ' 온라인' }
+  document.getElementById('uptime').textContent = uptime(status.uptime)
 }
 
 async function refresh() {
   try {
-    const [statusRes, monitorRes] = await Promise.all([
+    const [s, m] = await Promise.all([
       fetch('/api/status').then(r => r.json()).catch(() => null),
       fetch('http://127.0.0.1:8899/api/monitor').then(r => r.json()).catch(() => ({})),
     ])
-    if (statusRes) statusData = statusRes
-    monitorData = monitorRes || {}
+    if (s) status = s
+    mon = m || {}
+    renderAlerts()
     renderCards()
     renderTimeline()
+    renderCompleted()
     updateGlobal()
-  } catch (e) {
-    document.getElementById('global-dot').className = 'dot red'
-    document.getElementById('global-text').textContent = 'Connection Lost'
+  } catch {
+    document.getElementById('gdot').className = 'dot red'
+    document.getElementById('gtxt').textContent = '연결 끊김'
   }
 }
-
 setInterval(refresh, 5000)
 refresh()
 </script>
