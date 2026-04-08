@@ -1,0 +1,27 @@
+{
+  "name": "claude-discord-bridge",
+  "version": "1.0.0",
+  "description": "Route Discord channels to separate Claude Code sessions — each channel controls a different project",
+  "type": "module",
+  "scripts": {
+    "setup": "node setup.js",
+    "start": "bash start.sh",
+    "stop": "tmux kill-session -t claude-discord-bridge 2>/dev/null || true"
+  },
+  "keywords": [
+    "claude-code",
+    "discord",
+    "mcp",
+    "multi-project",
+    "automation"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "discord.js": "^14.18.0",
+    "zod": "^3.24.0"
+  }
+}
