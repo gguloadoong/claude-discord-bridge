@@ -98,9 +98,9 @@ for ((i = 1; i < NUM_CHANNELS; i++)); do
   sleep 1
 done
 
-# Bot pane (last)
+# Bot + Monitor pane (monitor runs in background, bot in foreground)
 tmux split-window -t "$SESSION:dashboard" \
-  "cd $(printf '%q' "$BRIDGE_DIR") && node bot.js; echo '[bot exited]'; read"
+  "cd $(printf '%q' "$BRIDGE_DIR") && node monitor.js & node bot.js; echo '[bot exited]'; read"
 
 sleep 1
 

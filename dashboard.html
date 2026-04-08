@@ -13,7 +13,6 @@
     min-height: 100vh;
   }
 
-  /* Header */
   .header {
     background: #161b22;
     border-bottom: 1px solid #30363d;
@@ -22,182 +21,155 @@
     justify-content: space-between;
     align-items: center;
   }
-  .header h1 {
-    font-size: 18px;
-    font-weight: 600;
-    color: #58a6ff;
-  }
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    font-size: 13px;
-    color: #8b949e;
-  }
-  .global-status {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-weight: 500;
-  }
-  .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-  }
+  .header h1 { font-size: 18px; font-weight: 600; color: #58a6ff; }
+  .header-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: #8b949e; }
+  .global-status { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
   .dot.green { background: #3fb950; box-shadow: 0 0 6px #3fb95080; }
   .dot.yellow { background: #d29922; box-shadow: 0 0 6px #d2992280; }
   .dot.red { background: #f85149; box-shadow: 0 0 6px #f8514980; }
   .dot.grey { background: #484f58; }
+  .dot.blue { background: #58a6ff; box-shadow: 0 0 6px #58a6ff80; }
 
-  /* Cards */
-  .cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 16px;
-    padding: 24px;
-  }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; padding: 24px; }
   .card {
     background: #161b22;
     border: 1px solid #30363d;
     border-radius: 12px;
     padding: 20px;
     transition: border-color 0.2s;
+    position: relative;
+    overflow: hidden;
   }
   .card:hover { border-color: #58a6ff40; }
-  .card.offline { opacity: 0.6; }
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-  }
-  .card-title {
-    font-size: 16px;
-    font-weight: 600;
+  .card.working { border-left: 3px solid #58a6ff; }
+  .card.idle { border-left: 3px solid #30363d; }
+  .card.offline { border-left: 3px solid #484f58; opacity: 0.6; }
+
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .card-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .card-icon { font-size: 20px; }
+
+  .status-badge { font-size: 11px; padding: 3px 10px; border-radius: 10px; font-weight: 500; }
+  .status-badge.working { background: #1f3a5f; color: #58a6ff; }
+  .status-badge.thinking { background: #3b2e00; color: #d29922; }
+  .status-badge.idle { background: #1c2128; color: #8b949e; }
+  .status-badge.offline { background: #2d1b1b; color: #f85149; }
+
+  .card-body { display: flex; flex-direction: column; gap: 12px; }
+
+  .info-row {
     display: flex;
     align-items: center;
     gap: 8px;
+    font-size: 13px;
+    color: #8b949e;
   }
-  .card-icon { font-size: 20px; }
-  .status-badge {
-    font-size: 11px;
+  .info-label { min-width: 50px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #484f58; }
+  .info-value { color: #c9d1d9; }
+  .info-value.highlight { color: #58a6ff; font-weight: 500; }
+  .info-value.warn { color: #d29922; }
+
+  .agent-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #1f3a5f;
+    color: #58a6ff;
     padding: 2px 8px;
-    border-radius: 10px;
+    border-radius: 6px;
+    font-size: 12px;
     font-weight: 500;
   }
-  .status-badge.online { background: #238636; color: #fff; }
-  .status-badge.offline { background: #484f58; color: #8b949e; }
-
-  .card-stats {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 16px;
+  .tool-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #1c2128;
+    color: #8b949e;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 12px;
   }
-  .stat {
+
+  .actions-list {
+    background: #0d1117;
+    border-radius: 8px;
+    padding: 8px 12px;
+    max-height: 80px;
+    overflow-y: auto;
+  }
+  .actions-list::-webkit-scrollbar { width: 4px; }
+  .actions-list::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+  .action-item {
+    font-size: 12px;
+    color: #8b949e;
+    padding: 2px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .action-icon { font-size: 10px; color: #484f58; }
+
+  .last-request {
     background: #0d1117;
     border-radius: 8px;
     padding: 10px 12px;
   }
-  .stat-label {
-    font-size: 11px;
-    color: #8b949e;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  .stat-value {
-    font-size: 22px;
-    font-weight: 700;
-    margin-top: 2px;
-  }
-  .stat-value.error { color: #f85149; }
+  .last-request-label { font-size: 11px; color: #484f58; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .last-request-text { font-size: 13px; color: #c9d1d9; line-height: 1.4; }
+  .last-request-meta { font-size: 11px; color: #484f58; margin-top: 4px; }
 
-  .last-message {
+  .stats-row {
+    display: flex;
+    gap: 12px;
+  }
+  .stat-mini {
     background: #0d1117;
     border-radius: 8px;
-    padding: 12px;
-    min-height: 60px;
+    padding: 8px 12px;
+    flex: 1;
+    text-align: center;
   }
-  .last-message-label {
-    font-size: 11px;
-    color: #8b949e;
-    margin-bottom: 6px;
-  }
-  .last-message-text {
-    font-size: 13px;
-    color: #c9d1d9;
-    line-height: 1.4;
-  }
-  .last-message-meta {
-    font-size: 11px;
-    color: #8b949e;
-    margin-top: 6px;
-  }
+  .stat-mini-value { font-size: 18px; font-weight: 700; }
+  .stat-mini-label { font-size: 10px; color: #484f58; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+  .stat-mini-value.error { color: #f85149; }
+
+  /* Context bar */
+  .ctx-bar { width: 100%; height: 4px; background: #21262d; border-radius: 2px; margin-top: 4px; }
+  .ctx-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
+  .ctx-fill.low { background: #3fb950; }
+  .ctx-fill.mid { background: #d29922; }
+  .ctx-fill.high { background: #f85149; }
 
   /* Timeline */
-  .timeline-section {
-    padding: 0 24px 24px;
-  }
+  .timeline-section { padding: 0 24px 24px; }
   .timeline-header {
-    font-size: 14px;
-    font-weight: 600;
-    color: #8b949e;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #21262d;
+    font-size: 14px; font-weight: 600; color: #8b949e;
+    margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #21262d;
   }
   .timeline {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 12px;
-    overflow: hidden;
-    max-height: 350px;
-    overflow-y: auto;
+    background: #161b22; border: 1px solid #30363d; border-radius: 12px;
+    overflow: hidden; max-height: 300px; overflow-y: auto;
   }
   .timeline::-webkit-scrollbar { width: 6px; }
-  .timeline::-webkit-scrollbar-track { background: transparent; }
   .timeline::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
-
   .timeline-item {
-    padding: 10px 16px;
-    border-bottom: 1px solid #21262d;
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    font-size: 13px;
-    transition: background 0.15s;
+    padding: 8px 16px; border-bottom: 1px solid #21262d;
+    display: flex; align-items: center; gap: 10px; font-size: 13px;
   }
   .timeline-item:hover { background: #1c2128; }
   .timeline-item:last-child { border-bottom: none; }
-  .timeline-time {
-    color: #484f58;
-    font-size: 12px;
-    white-space: nowrap;
-    min-width: 45px;
-  }
-  .timeline-channel {
-    font-weight: 600;
-    white-space: nowrap;
-    min-width: 90px;
-  }
-  .timeline-user { color: #58a6ff; white-space: nowrap; }
+  .timeline-time { color: #484f58; font-size: 12px; min-width: 45px; }
+  .timeline-channel { font-weight: 600; min-width: 80px; }
+  .timeline-user { color: #58a6ff; }
   .timeline-text { color: #8b949e; flex: 1; }
 
-  .empty-state {
-    text-align: center;
-    padding: 40px;
-    color: #484f58;
-    font-size: 14px;
-  }
+  .empty-state { text-align: center; padding: 30px; color: #484f58; font-size: 14px; }
 
-  /* Pulse animation for active status */
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
-  .working { animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+  .pulse { animation: pulse 2s ease-in-out infinite; }
 </style>
 </head>
 <body>
@@ -223,18 +195,27 @@
 </div>
 
 <script>
-const ICONS = { market: '📊', shorts: '🎬', general: '🏠' }
-const REFRESH_MS = 5000
+const ICONS = { market: '\u{1F4CA}', shorts: '\u{1F3AC}', general: '\u{1F3E0}' }
+const TOOL_ICONS = {
+  Bash: '\u{1F4BB}', Read: '\u{1F4D6}', Edit: '\u270F\uFE0F', Write: '\u{1F4DD}',
+  Grep: '\u{1F50D}', Glob: '\u{1F4C2}', Skill: '\u26A1', Reply: '\u{1F4AC}',
+}
+const STATE_LABELS = {
+  working: 'Working', thinking: 'Thinking', idle: 'Idle', offline: 'Offline',
+}
+
+let monitorData = {}
+let statusData = { channels: [], recentMessages: [], uptime: 0 }
 
 function timeAgo(ts) {
+  if (!ts) return ''
   const sec = Math.floor((Date.now() - ts) / 1000)
   if (sec < 10) return 'just now'
   if (sec < 60) return sec + 's ago'
   const min = Math.floor(sec / 60)
   if (min < 60) return min + 'm ago'
   const hr = Math.floor(min / 60)
-  if (hr < 24) return hr + 'h ago'
-  return Math.floor(hr / 24) + 'd ago'
+  return hr + 'h ago'
 }
 
 function formatUptime(sec) {
@@ -245,52 +226,86 @@ function formatUptime(sec) {
 
 function formatTime(ts) {
   const d = new Date(ts)
-  return d.getHours().toString().padStart(2, '0') + ':' +
-         d.getMinutes().toString().padStart(2, '0')
+  return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0')
 }
 
-function renderCards(channels) {
+function renderCards() {
   const container = document.getElementById('cards')
-  container.innerHTML = channels.map((ch, i) => {
-    const icon = ICONS[ch.slug] || '📂'
-    const statusClass = ch.online ? 'online' : 'offline'
-    const statusText = ch.online ? 'Online' : 'Offline'
-    const cardClass = ch.online ? '' : 'offline'
-    const errorClass = ch.errors > 0 ? 'error' : ''
+  container.innerHTML = statusData.channels.map(ch => {
+    const icon = ICONS[ch.slug] || '\u{1F4C2}'
+    const mon = monitorData[ch.slug] || {}
+    const state = !ch.online ? 'offline' : (mon.state || 'idle')
+    const stateLabel = STATE_LABELS[state] || state
+    const cardClass = state === 'offline' ? 'offline' : (state === 'idle' ? 'idle' : 'working')
+    const statePulse = (state === 'working' || state === 'thinking') ? 'pulse' : ''
 
-    let lastMsg = '<span style="color:#484f58">No messages yet</span>'
-    let lastMeta = ''
+    // Agent info
+    let agentHtml = ''
+    if (mon.agent) {
+      agentHtml = '<div class="info-row"><span class="info-label">Agent</span><span class="agent-badge">' + mon.agent + '</span></div>'
+    }
+
+    // Tool info
+    let toolHtml = ''
+    if (mon.tool) {
+      const toolIcon = TOOL_ICONS[mon.tool] || '\u{1F527}'
+      const detail = mon.toolDetail ? ': ' + mon.toolDetail.slice(0, 40) : ''
+      toolHtml = '<div class="info-row"><span class="info-label">Tool</span><span class="tool-badge">' + toolIcon + ' ' + mon.tool + detail + '</span></div>'
+    }
+
+    // Context bar
+    let ctxHtml = ''
+    if (mon.context != null) {
+      const ctxClass = mon.context < 50 ? 'low' : mon.context < 80 ? 'mid' : 'high'
+      ctxHtml = '<div class="info-row"><span class="info-label">CTX</span><span class="info-value">' + mon.context + '%</span></div>' +
+        '<div class="ctx-bar"><div class="ctx-fill ' + ctxClass + '" style="width:' + mon.context + '%"></div></div>'
+    }
+
+    // Session
+    let sessionHtml = ''
+    if (mon.session) {
+      sessionHtml = '<div class="info-row"><span class="info-label">Session</span><span class="info-value">' + mon.session + '</span></div>'
+    }
+
+    // Last request
+    let lastReqHtml = '<div class="last-request"><div class="last-request-label">Last Request</div><div class="last-request-text" style="color:#484f58">No messages yet</div></div>'
     if (ch.lastMessage) {
-      lastMsg = '"' + ch.lastMessage.preview + '"'
-      lastMeta = ch.lastMessage.user + ' · ' + timeAgo(ch.lastMessage.time)
+      lastReqHtml = '<div class="last-request">' +
+        '<div class="last-request-label">Last Request</div>' +
+        '<div class="last-request-text">"' + ch.lastMessage.preview + '"</div>' +
+        '<div class="last-request-meta">' + ch.lastMessage.user + ' · ' + timeAgo(ch.lastMessage.time) + '</div>' +
+      '</div>'
     }
 
     return '<div class="card ' + cardClass + '">' +
       '<div class="card-header">' +
         '<div class="card-title"><span class="card-icon">' + icon + '</span>' + ch.name + '</div>' +
-        '<span class="status-badge ' + statusClass + '">' + statusText + '</span>' +
+        '<span class="status-badge ' + state + ' ' + statePulse + '">' + stateLabel + '</span>' +
       '</div>' +
-      '<div class="card-stats">' +
-        '<div class="stat"><div class="stat-label">Messages Today</div><div class="stat-value">' + ch.messagesToday + '</div></div>' +
-        '<div class="stat"><div class="stat-label">Errors</div><div class="stat-value ' + errorClass + '">' + ch.errors + '</div></div>' +
-      '</div>' +
-      '<div class="last-message">' +
-        '<div class="last-message-label">Last Request</div>' +
-        '<div class="last-message-text">' + lastMsg + '</div>' +
-        (lastMeta ? '<div class="last-message-meta">' + lastMeta + '</div>' : '') +
+      '<div class="card-body">' +
+        agentHtml +
+        toolHtml +
+        sessionHtml +
+        ctxHtml +
+        '<div class="stats-row">' +
+          '<div class="stat-mini"><div class="stat-mini-value">' + ch.messagesToday + '</div><div class="stat-mini-label">Messages</div></div>' +
+          '<div class="stat-mini"><div class="stat-mini-value ' + (ch.errors > 0 ? 'error' : '') + '">' + ch.errors + '</div><div class="stat-mini-label">Errors</div></div>' +
+        '</div>' +
+        lastReqHtml +
       '</div>' +
     '</div>'
   }).join('')
 }
 
-function renderTimeline(messages) {
+function renderTimeline() {
   const container = document.getElementById('timeline')
-  if (!messages || messages.length === 0) {
+  const msgs = statusData.recentMessages
+  if (!msgs || msgs.length === 0) {
     container.innerHTML = '<div class="empty-state">Waiting for messages...</div>'
     return
   }
-  container.innerHTML = messages.map(m => {
-    const icon = ICONS[m.slug] || '📂'
+  container.innerHTML = msgs.map(m => {
+    const icon = ICONS[m.slug] || '\u{1F4C2}'
     return '<div class="timeline-item">' +
       '<span class="timeline-time">' + formatTime(m.time) + '</span>' +
       '<span class="timeline-channel">' + icon + ' ' + m.channel + '</span>' +
@@ -300,40 +315,39 @@ function renderTimeline(messages) {
   }).join('')
 }
 
-function updateGlobalStatus(channels) {
+function updateGlobal() {
   const dot = document.getElementById('global-dot')
   const text = document.getElementById('global-text')
-  const onlineCount = channels.filter(c => c.online).length
-  const total = channels.length
+  const chs = statusData.channels
+  const online = chs.filter(c => c.online).length
+  const working = Object.values(monitorData).filter(m => m.state === 'working' || m.state === 'thinking').length
 
-  if (onlineCount === total) {
-    dot.className = 'dot green'
-    text.textContent = 'All Online'
-  } else if (onlineCount > 0) {
-    dot.className = 'dot yellow'
-    text.textContent = onlineCount + '/' + total + ' Online'
-  } else {
-    dot.className = 'dot red'
-    text.textContent = 'All Offline'
-  }
+  if (online === 0) { dot.className = 'dot red'; text.textContent = 'All Offline'; }
+  else if (working > 0) { dot.className = 'dot blue pulse'; text.textContent = working + ' Working'; }
+  else if (online === chs.length) { dot.className = 'dot green'; text.textContent = 'All Online'; }
+  else { dot.className = 'dot yellow'; text.textContent = online + '/' + chs.length + ' Online'; }
+
+  document.getElementById('uptime').textContent = formatUptime(statusData.uptime)
 }
 
 async function refresh() {
   try {
-    const res = await fetch('/api/status')
-    const data = await res.json()
-
-    renderCards(data.channels)
-    renderTimeline(data.recentMessages)
-    updateGlobalStatus(data.channels)
-    document.getElementById('uptime').textContent = formatUptime(data.uptime)
+    const [statusRes, monitorRes] = await Promise.all([
+      fetch('/api/status').then(r => r.json()).catch(() => null),
+      fetch('http://127.0.0.1:8899/api/monitor').then(r => r.json()).catch(() => ({})),
+    ])
+    if (statusRes) statusData = statusRes
+    monitorData = monitorRes || {}
+    renderCards()
+    renderTimeline()
+    updateGlobal()
   } catch (e) {
     document.getElementById('global-dot').className = 'dot red'
     document.getElementById('global-text').textContent = 'Connection Lost'
   }
 }
 
-setInterval(refresh, REFRESH_MS)
+setInterval(refresh, 5000)
 refresh()
 </script>
 </body>
