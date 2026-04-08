@@ -150,10 +150,24 @@ client.on(Events.Error, (err) => {
 })
 
 client.on(Events.MessageCreate, async (message) => {
-  if (message.author.bot) return
-
   const target = channelMap.get(message.channelId)
   if (!target) return
+
+  // Track bot replies for dashboard conversation flow
+  if (message.author.bot && message.author.id === client.user.id) {
+    recentMessages.unshift({
+      channel: target.name,
+      slug: target.slug,
+      user: 'Claude',
+      preview: message.content.slice(0, 120),
+      time: Date.now(),
+      isReply: true,
+    })
+    if (recentMessages.length > MAX_RECENT) recentMessages.length = MAX_RECENT
+    return
+  }
+
+  if (message.author.bot) return
 
   // Check user allowlist (if configured)
   if (target.allowedUsers && !target.allowedUsers.includes(message.author.id)) {
