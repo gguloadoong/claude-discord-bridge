@@ -3,330 +3,346 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Claude Bridge Control Room</title>
+<title>Control Room</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e1e4e8; min-height: 100vh; }
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0c10;color:#e1e4e8;min-height:100vh}
 
-  .header { background: #161b22; border-bottom: 1px solid #30363d; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; }
-  .header h1 { font-size: 17px; font-weight: 600; color: #58a6ff; }
-  .header-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: #8b949e; }
-  .global-status { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+/* Header */
+.hdr{background:#12151a;border-bottom:1px solid #1e2228;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
+.hdr h1{font-size:15px;font-weight:600;color:#58a6ff;letter-spacing:0.5px}
+.hdr-r{display:flex;align-items:center;gap:14px;font-size:12px;color:#6e7681}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.dot.g{background:#3fb950;box-shadow:0 0 8px #3fb95060}.dot.b{background:#58a6ff;box-shadow:0 0 8px #58a6ff60}
+.dot.y{background:#d29922;box-shadow:0 0 8px #d2992260}.dot.r{background:#f85149;box-shadow:0 0 8px #f8514960}
+.dot.x{background:#3d424a}
 
-  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
-  .dot.green { background: #3fb950; box-shadow: 0 0 6px #3fb95080; }
-  .dot.yellow { background: #d29922; box-shadow: 0 0 6px #d2992280; }
-  .dot.red { background: #f85149; box-shadow: 0 0 6px #f8514980; }
-  .dot.grey { background: #484f58; }
-  .dot.blue { background: #58a6ff; box-shadow: 0 0 6px #58a6ff80; }
+/* Time filter */
+.time-bar{padding:10px 20px;display:flex;gap:6px;align-items:center}
+.time-btn{background:#161b22;border:1px solid #21262d;color:#8b949e;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer;transition:all .15s}
+.time-btn:hover{border-color:#58a6ff60;color:#c9d1d9}
+.time-btn.active{background:#1f3a5f;border-color:#58a6ff;color:#58a6ff}
+.time-label{font-size:11px;color:#484f58;margin-right:6px}
 
-  /* Alerts */
-  .alerts { padding: 12px 24px 0; display: flex; flex-direction: column; gap: 8px; }
-  .alert { padding: 10px 16px; border-radius: 8px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
-  .alert.red { background: #2d1b1b; border: 1px solid #f8514940; color: #f85149; }
-  .alert.yellow { background: #2d2600; border: 1px solid #d2992240; color: #d29922; }
-  .alert-icon { font-size: 16px; }
-  .alert-text { flex: 1; }
-  .alerts:empty { display: none; padding: 0; }
+/* Alerts */
+.alerts{padding:0 20px}
+.alert{padding:8px 14px;border-radius:6px;font-size:12px;display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.alert.r{background:#2a1215;border:1px solid #f8514930;color:#f85149}
+.alert.y{background:#2a2000;border:1px solid #d2992230;color:#d29922}
 
-  /* Cards */
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; padding: 16px 24px; }
-  .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 18px; position: relative; }
-  .card:hover { border-color: #58a6ff30; }
-  .card.working { border-left: 3px solid #58a6ff; }
-  .card.thinking { border-left: 3px solid #d29922; }
-  .card.idle { border-left: 3px solid #30363d; }
-  .card.offline { border-left: 3px solid #f85149; opacity: 0.6; }
+/* Executive summary */
+.exec{padding:10px 20px;display:flex;gap:10px;flex-wrap:wrap}
+.exec-chip{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:8px 14px;font-size:12px;display:flex;align-items:center;gap:8px;flex:1;min-width:200px;cursor:pointer;transition:all .15s}
+.exec-chip:hover{border-color:#58a6ff40;background:#1c2128}
+.exec-chip .icon{font-size:16px}
+.exec-chip .name{font-weight:600;color:#c9d1d9}
+.exec-chip .summary{color:#8b949e;flex:1}
+.exec-chip .st{font-size:11px;padding:2px 7px;border-radius:5px;font-weight:500}
+.exec-chip .st.working{background:#1f3a5f;color:#58a6ff}.exec-chip .st.thinking{background:#3b2e00;color:#d29922}
+.exec-chip .st.idle{background:#1c2128;color:#6e7681}.exec-chip .st.offline{background:#2a1215;color:#f85149}
 
-  .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-  .card-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-  .card-title a { color: inherit; text-decoration: none; }
-  .card-title a:hover { color: #58a6ff; }
-  .card-icon { font-size: 18px; }
-  .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
-  .badge.working { background: #1f3a5f; color: #58a6ff; }
-  .badge.thinking { background: #3b2e00; color: #d29922; }
-  .badge.idle { background: #1c2128; color: #8b949e; }
-  .badge.offline { background: #2d1b1b; color: #f85149; }
+/* Project panels */
+.panels{padding:8px 20px 20px}
+.panel{background:#12151a;border:1px solid #1e2228;border-radius:10px;margin-bottom:10px;overflow:hidden;transition:all .2s}
+.panel.open{border-color:#58a6ff30}
+.panel-hdr{padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none}
+.panel-hdr:hover{background:#161b22}
+.panel-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600}
+.panel-title .icon{font-size:16px}
+.panel-meta{display:flex;align-items:center;gap:10px;font-size:11px;color:#6e7681}
+.panel-arrow{color:#484f58;transition:transform .2s;font-size:12px}
+.panel.open .panel-arrow{transform:rotate(90deg)}
+.panel-body{max-height:0;overflow:hidden;transition:max-height .3s ease-out}
+.panel.open .panel-body{max-height:2000px;transition:max-height .5s ease-in}
+.panel-inner{padding:0 16px 16px}
 
-  /* Current task */
-  .task-box { background: #0d1117; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
-  .task-label { font-size: 10px; color: #484f58; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-  .task-text { font-size: 13px; color: #c9d1d9; line-height: 1.4; }
-  .task-meta { font-size: 11px; color: #484f58; margin-top: 4px; display: flex; gap: 12px; }
-  .task-text.dim { color: #484f58; }
+/* Live status row */
+.live-row{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.live-tag{font-size:11px;padding:3px 8px;border-radius:5px;display:inline-flex;align-items:center;gap:4px}
+.live-tag.agent{background:#1f3a5f;color:#58a6ff}
+.live-tag.tool{background:#1c2128;color:#8b949e}
+.live-tag.branch{background:#1a2332;color:#79c0ff}
+.live-tag.ctx{background:#1c2128;color:#6e7681}
 
-  /* Agent/Tool row */
-  .agent-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-  .tag { font-size: 11px; padding: 2px 7px; border-radius: 5px; display: inline-flex; align-items: center; gap: 3px; }
-  .tag.agent { background: #1f3a5f; color: #58a6ff; }
-  .tag.tool { background: #1c2128; color: #8b949e; }
-  .tag.branch { background: #1a2332; color: #79c0ff; }
+/* Stats row */
+.stats-row{display:flex;gap:6px;margin-bottom:12px}
+.s-box{background:#0d1017;border-radius:6px;padding:7px 10px;flex:1;text-align:center}
+.s-val{font-size:17px;font-weight:700}.s-lbl{font-size:9px;color:#484f58;text-transform:uppercase;letter-spacing:.5px;margin-top:1px}
+.s-val.err{color:#f85149}
 
-  /* Stats */
-  .stats { display: flex; gap: 8px; margin-bottom: 10px; }
-  .stat { background: #0d1117; border-radius: 6px; padding: 6px 10px; flex: 1; text-align: center; }
-  .stat-val { font-size: 16px; font-weight: 700; }
-  .stat-lbl { font-size: 9px; color: #484f58; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px; }
-  .stat-val.err { color: #f85149; }
+/* Work units */
+.work-units{display:flex;flex-direction:column;gap:8px}
+.wu{background:#0d1017;border-radius:8px;border:1px solid #1a1e24;overflow:hidden}
+.wu-req{padding:10px 12px;border-bottom:1px solid #1a1e24}
+.wu-req-text{font-size:13px;color:#c9d1d9;line-height:1.5}
+.wu-req-meta{font-size:11px;color:#484f58;margin-top:4px;display:flex;gap:10px}
+.wu-resp{padding:10px 12px;background:#0f1218}
+.wu-resp-text{font-size:12px;color:#8b949e;line-height:1.5}
+.wu-resp-meta{font-size:10px;color:#484f58;margin-top:3px}
+.wu-no-resp{padding:6px 12px;font-size:11px;color:#484f58;font-style:italic}
 
-  /* Context bar */
-  .ctx-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 11px; color: #484f58; }
-  .ctx-bar { flex: 1; height: 4px; background: #21262d; border-radius: 2px; }
-  .ctx-fill { height: 100%; border-radius: 2px; transition: width 0.5s; }
-  .ctx-fill.low { background: #3fb950; }
-  .ctx-fill.mid { background: #d29922; }
-  .ctx-fill.high { background: #f85149; }
+/* Git section in panel */
+.git-section{margin-top:12px;padding-top:10px;border-top:1px solid #1a1e24}
+.git-hdr{font-size:10px;color:#484f58;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.git-item{font-size:12px;color:#8b949e;padding:2px 0;display:flex;gap:6px}
+.pr-tag{font-size:10px;padding:1px 5px;border-radius:4px}
+.pr-tag.open{background:#1a4d2e;color:#3fb950}.pr-tag.merged{background:#2a1a4d;color:#a371f7}
 
-  /* Git progress */
-  .git-section { margin-bottom: 6px; }
-  .git-header { font-size: 10px; color: #484f58; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-  .git-item { font-size: 12px; color: #8b949e; padding: 2px 0; display: flex; align-items: flex-start; gap: 6px; }
-  .git-item .gi { font-size: 11px; flex-shrink: 0; }
-  .pr-badge { font-size: 10px; padding: 1px 5px; border-radius: 4px; }
-  .pr-badge.open { background: #1a4d2e; color: #3fb950; }
-  .pr-badge.merged { background: #2a1a4d; color: #a371f7; }
+/* Context bar */
+.ctx-bar-wrap{display:flex;align-items:center;gap:6px;font-size:11px;color:#484f58;margin-top:8px}
+.ctx-bar{flex:1;height:3px;background:#1a1e24;border-radius:2px}
+.ctx-fill{height:100%;border-radius:2px;transition:width .5s}
+.ctx-fill.lo{background:#3fb950}.ctx-fill.md{background:#d29922}.ctx-fill.hi{background:#f85149}
 
-  /* Bottom sections */
-  .bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 0 24px 24px; }
-  @media (max-width: 900px) { .bottom { grid-template-columns: 1fr; } }
+/* Empty */
+.empty{text-align:center;padding:20px;color:#3d424a;font-size:12px}
 
-  .section { background: #161b22; border: 1px solid #30363d; border-radius: 12px; overflow: hidden; }
-  .section-hdr { font-size: 13px; font-weight: 600; color: #8b949e; padding: 12px 16px; border-bottom: 1px solid #21262d; }
-  .section-body { max-height: 280px; overflow-y: auto; }
-  .section-body::-webkit-scrollbar { width: 5px; }
-  .section-body::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+/* Pulse */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.pulse{animation:pulse 2s ease-in-out infinite}
 
-  /* Timeline */
-  .tl-item { padding: 8px 16px; border-bottom: 1px solid #21262d; display: flex; align-items: center; gap: 8px; font-size: 12px; }
-  .tl-item:last-child { border-bottom: none; }
-  .tl-item:hover { background: #1c2128; }
-  .tl-time { color: #484f58; min-width: 40px; }
-  .tl-ch { font-weight: 600; min-width: 70px; }
-  .tl-user { color: #58a6ff; min-width: 40px; }
-  .tl-bot { color: #a371f7; min-width: 40px; }
-  .tl-reply { background: #13111a; }
-  .tl-text { color: #8b949e; flex: 1; }
-
-  /* Completed work */
-  .done-item { padding: 8px 16px; border-bottom: 1px solid #21262d; font-size: 12px; }
-  .done-item:last-child { border-bottom: none; }
-  .done-title { color: #c9d1d9; }
-  .done-meta { color: #484f58; font-size: 11px; margin-top: 2px; }
-
-  .empty { text-align: center; padding: 24px; color: #484f58; font-size: 13px; }
-
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
-  .pulse { animation: pulse 2s ease-in-out infinite; }
+/* Discord link */
+.dc-link{font-size:11px;color:#5865F2;text-decoration:none;display:inline-flex;align-items:center;gap:3px}
+.dc-link:hover{text-decoration:underline}
 </style>
 </head>
 <body>
 
-<div class="header">
-  <h1>Claude Bridge Control Room</h1>
-  <div class="header-right">
+<div class="hdr">
+  <h1>CONTROL ROOM</h1>
+  <div class="hdr-r">
     <span id="uptime">--</span>
-    <div class="global-status">
-      <span class="dot grey" id="gdot"></span>
-      <span id="gtxt">Loading...</span>
-    </div>
+    <div style="display:flex;align-items:center;gap:5px"><span class="dot x" id="gdot"></span><span id="gtxt">...</span></div>
   </div>
+</div>
+
+<div class="time-bar">
+  <span class="time-label">기간</span>
+  <button class="time-btn" data-h="1">1시간</button>
+  <button class="time-btn" data-h="3">3시간</button>
+  <button class="time-btn active" data-h="24">오늘</button>
+  <button class="time-btn" data-h="0">전체</button>
 </div>
 
 <div class="alerts" id="alerts"></div>
-<div class="cards" id="cards"></div>
-
-<div class="bottom">
-  <div class="section">
-    <div class="section-hdr">Recent Messages</div>
-    <div class="section-body" id="timeline"></div>
-  </div>
-  <div class="section">
-    <div class="section-hdr">Completed Work</div>
-    <div class="section-body" id="completed"></div>
-  </div>
-</div>
+<div class="exec" id="exec"></div>
+<div class="panels" id="panels"></div>
 
 <script>
-const ICONS = { market: '\u{1F4CA}', shorts: '\u{1F3AC}', general: '\u{1F3E0}' }
-const GUILD = null // filled from API
-const STATE_KR = { working: '작업중', thinking: '생각중', idle: '대기', offline: '오프라인' }
+const ICONS={market:'\u{1F4CA}',shorts:'\u{1F3AC}',general:'\u{1F3E0}'}
+const ST_KR={working:'작업중',thinking:'생각중',idle:'대기',offline:'오프라인'}
+let mon={},sts={channels:[],recentMessages:[],uptime:0,guildId:''},filterH=24,openPanels=new Set()
 
-let mon = {}, status = { channels: [], recentMessages: [], uptime: 0 }
+function ta(ts){if(!ts)return'';const s=Math.floor((Date.now()-ts)/1000);if(s<10)return'방금';if(s<60)return s+'초 전';const m=Math.floor(s/60);if(m<60)return m+'분 전';const h=Math.floor(m/60);if(h<24)return h+'시간 전';return Math.floor(h/24)+'일 전'}
+function hm(ts){const d=new Date(ts);return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')}
+function up(s){return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m'}
+function trunc(s,n){return s&&s.length>n?s.slice(0,n-1)+'…':s||''}
+function cutoff(){return filterH===0?0:Date.now()-filterH*3600*1000}
 
-function timeAgo(ts) {
-  if (!ts) return ''
-  const s = Math.floor((Date.now() - ts) / 1000)
-  if (s < 10) return '방금'
-  if (s < 60) return s + '초 전'
-  const m = Math.floor(s / 60)
-  if (m < 60) return m + '분 전'
-  return Math.floor(m / 60) + '시간 전'
-}
-function hm(ts) { const d = new Date(ts); return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0') }
-function uptime(s) { return Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm' }
-
-function renderAlerts() {
-  const el = document.getElementById('alerts')
-  const alerts = []
-  status.channels.forEach(ch => {
-    const m = mon[ch.slug] || {}
-    if (!ch.online) alerts.push({ level: 'red', icon: '\u{1F6A8}', text: ch.name + ' 서버 오프라인' })
-    if (m.context > 80) alerts.push({ level: 'yellow', icon: '\u26A0\uFE0F', text: ch.name + ' 컨텍스트 ' + m.context + '% — 세션 재시작 필요할 수 있음' })
-    if (ch.errors > 3) alerts.push({ level: 'yellow', icon: '\u{1F4A5}', text: ch.name + ' 에러 ' + ch.errors + '건 발생' })
-  })
-  el.innerHTML = alerts.map(a =>
-    '<div class="alert ' + a.level + '"><span class="alert-icon">' + a.icon + '</span><span class="alert-text">' + a.text + '</span></div>'
-  ).join('')
-}
-
-function renderCards() {
-  const el = document.getElementById('cards')
-  el.innerHTML = status.channels.map(ch => {
-    const m = mon[ch.slug] || {}
-    const gh = m.github || null
-    const icon = ICONS[ch.slug] || '\u{1F4C2}'
-    const st = !ch.online ? 'offline' : (m.state || 'idle')
-    const stKr = STATE_KR[st] || st
-    const p = (st === 'working' || st === 'thinking') ? ' pulse' : ''
-
-    // Discord deep link
-    const guildId = status.guildId || ''
-    const discordLink = guildId ? 'https://discord.com/channels/' + guildId + '/' + ch.id : '#'
-
-    // Current task
-    let taskHtml
-    if (ch.lastMessage && (st === 'working' || st === 'thinking')) {
-      const elapsed = timeAgo(ch.lastMessage.time)
-      taskHtml = '<div class="task-box"><div class="task-label">현재 작업</div>' +
-        '<div class="task-text">"' + ch.lastMessage.preview + '"</div>' +
-        '<div class="task-meta"><span>' + ch.lastMessage.user + '</span><span>' + elapsed + ' 시작</span></div></div>'
-    } else if (ch.lastMessage) {
-      taskHtml = '<div class="task-box"><div class="task-label">마지막 요청</div>' +
-        '<div class="task-text dim">"' + ch.lastMessage.preview + '"</div>' +
-        '<div class="task-meta"><span>' + ch.lastMessage.user + '</span><span>' + timeAgo(ch.lastMessage.time) + '</span></div></div>'
+// Group messages into work units (request + response pairs)
+function buildWorkUnits(slug){
+  const msgs=(sts.recentMessages||[]).filter(m=>m.slug===slug&&m.time>=cutoff())
+  const units=[]
+  let i=0
+  while(i<msgs.length){
+    const m=msgs[i]
+    if(!m.isReply){
+      const unit={req:m,responses:[]}
+      i++
+      while(i<msgs.length&&msgs[i].isReply&&msgs[i].slug===slug){
+        unit.responses.push(msgs[i]);i++
+      }
+      units.push(unit)
     } else {
-      taskHtml = '<div class="task-box"><div class="task-label">마지막 요청</div><div class="task-text dim">아직 없음</div></div>'
+      // Orphan response
+      units.push({req:null,responses:[m]});i++
+    }
+  }
+  return units.reverse() // newest first
+}
+
+// Time filter buttons
+document.querySelectorAll('.time-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.time-btn').forEach(b=>b.classList.remove('active'))
+    btn.classList.add('active')
+    filterH=parseInt(btn.dataset.h)
+    render()
+  })
+})
+
+function renderAlerts(){
+  const el=document.getElementById('alerts')
+  const a=[]
+  sts.channels.forEach(ch=>{
+    const m=mon[ch.slug]||{}
+    if(!ch.online)a.push({l:'r',t:'\u{1F6A8} '+ch.name+' 서버 오프라인'})
+    if(m.context>80)a.push({l:'y',t:'\u26A0\uFE0F '+ch.name+' 컨텍스트 '+m.context+'% — 세션 재시작 필요'})
+    if(ch.errors>3)a.push({l:'y',t:'\u{1F4A5} '+ch.name+' 에러 '+ch.errors+'건'})
+  })
+  el.innerHTML=a.map(x=>'<div class="alert '+x.l+'">'+x.t+'</div>').join('')
+}
+
+function renderExec(){
+  const el=document.getElementById('exec')
+  el.innerHTML=sts.channels.map((ch,idx)=>{
+    const m=mon[ch.slug]||{},gh=m.github||null
+    const icon=ICONS[ch.slug]||'\u{1F4C2}'
+    const st=!ch.online?'offline':(m.state||'idle')
+    const p=(st==='working'||st==='thinking')?' pulse':''
+
+    // One-line summary
+    let summary=''
+    if(st==='working'&&ch.lastMessage)summary=trunc(ch.lastMessage.preview,40)
+    else if(ch.lastMessage)summary='마지막: '+ta(ch.lastMessage.time)
+    else summary='대기중'
+
+    // Quick stats
+    let quick=''
+    if(gh){
+      const parts=[]
+      if(gh.commitsToday>0)parts.push(gh.commitsToday+'커밋')
+      if(gh.openPRs&&gh.openPRs.length>0)parts.push(gh.openPRs.length+'PR')
+      if(gh.openIssues&&gh.openIssues.length>0)parts.push(gh.openIssues.length+'이슈')
+      if(parts.length)quick=' · '+parts.join(' · ')
     }
 
-    // Agent/tool tags
-    let tags = ''
-    if (m.agent) tags += '<span class="tag agent">' + m.agent + '</span>'
-    if (m.tool) tags += '<span class="tag tool">' + m.tool + (m.toolDetail ? ': ' + m.toolDetail.slice(0,30) : '') + '</span>'
-    if (gh && gh.branch && gh.branch !== 'main') tags += '<span class="tag branch">\u{1F33F} ' + gh.branch + '</span>'
-    const agentHtml = tags ? '<div class="agent-row">' + tags + '</div>' : ''
+    return '<div class="exec-chip" onclick="togglePanel(\''+ch.slug+'\')">'+
+      '<span class="icon">'+icon+'</span>'+
+      '<span class="name">'+ch.name+'</span>'+
+      '<span class="summary">'+summary+quick+'</span>'+
+      '<span class="st '+st+p+'">'+ST_KR[st]+'</span>'+
+    '</div>'
+  }).join('')
+}
+
+function renderPanels(){
+  const el=document.getElementById('panels')
+  el.innerHTML=sts.channels.map(ch=>{
+    const m=mon[ch.slug]||{},gh=m.github||null
+    const icon=ICONS[ch.slug]||'\u{1F4C2}'
+    const st=!ch.online?'offline':(m.state||'idle')
+    const isOpen=openPanels.has(ch.slug)
+    const cls=isOpen?'panel open':'panel'
+    const gid=sts.guildId
+    const dcLink=gid?'https://discord.com/channels/'+gid+'/'+ch.id:'#'
+
+    // Live tags
+    let tags=''
+    if(m.agent)tags+='<span class="live-tag agent">\u2699 '+m.agent+'</span>'
+    if(m.tool)tags+='<span class="live-tag tool">\u{1F527} '+m.tool+(m.toolDetail?': '+trunc(m.toolDetail,25):'')+'</span>'
+    if(gh&&gh.branch&&gh.branch!=='main')tags+='<span class="live-tag branch">\u{1F33F} '+gh.branch+'</span>'
+    if(m.context!=null)tags+='<span class="live-tag ctx">CTX '+m.context+'%</span>'
 
     // Stats
-    const statsHtml = '<div class="stats">' +
-      '<div class="stat"><div class="stat-val">' + ch.messagesToday + '</div><div class="stat-lbl">메시지</div></div>' +
-      '<div class="stat"><div class="stat-val' + (ch.errors > 0 ? ' err' : '') + '">' + ch.errors + '</div><div class="stat-lbl">에러</div></div>' +
-      (gh ? '<div class="stat"><div class="stat-val">' + gh.commitsToday + '</div><div class="stat-lbl">커밋</div></div>' : '') +
-      (gh ? '<div class="stat"><div class="stat-val">' + gh.openPRs.length + '</div><div class="stat-lbl">PR</div></div>' : '') +
-      (gh ? '<div class="stat"><div class="stat-val">' + gh.openIssues.length + '</div><div class="stat-lbl">이슈</div></div>' : '') +
-    '</div>'
+    let statsHtml='<div class="stats-row">'
+    statsHtml+='<div class="s-box"><div class="s-val">'+ch.messagesToday+'</div><div class="s-lbl">메시지</div></div>'
+    statsHtml+='<div class="s-box"><div class="s-val'+(ch.errors>0?' err':'')+'">'+ch.errors+'</div><div class="s-lbl">에러</div></div>'
+    if(gh){
+      statsHtml+='<div class="s-box"><div class="s-val">'+gh.commitsToday+'</div><div class="s-lbl">커밋</div></div>'
+      statsHtml+='<div class="s-box"><div class="s-val">'+gh.openPRs.length+'</div><div class="s-lbl">PR</div></div>'
+      statsHtml+='<div class="s-box"><div class="s-val">'+gh.openIssues.length+'</div><div class="s-lbl">이슈</div></div>'
+    }
+    statsHtml+='</div>'
 
     // Context bar
-    let ctxHtml = ''
-    if (m.context != null) {
-      const cls = m.context < 50 ? 'low' : m.context < 80 ? 'mid' : 'high'
-      ctxHtml = '<div class="ctx-row">CTX ' + m.context + '%' +
-        (m.session ? ' · 세션 ' + m.session : '') +
-        '<div class="ctx-bar"><div class="ctx-fill ' + cls + '" style="width:' + m.context + '%"></div></div></div>'
+    let ctxHtml=''
+    if(m.context!=null){
+      const cls2=m.context<50?'lo':m.context<80?'md':'hi'
+      ctxHtml='<div class="ctx-bar-wrap">컨텍스트 '+m.context+'%'+(m.session?' · 세션 '+m.session:'')+
+        '<div class="ctx-bar"><div class="ctx-fill '+cls2+'" style="width:'+m.context+'%"></div></div></div>'
     }
 
-    // Recent commits
-    let commitsHtml = ''
-    if (gh && gh.recentCommits && gh.recentCommits.length > 0) {
-      commitsHtml = '<div class="git-section"><div class="git-header">오늘 작업 내역</div>' +
-        gh.recentCommits.slice(0, 3).map(c => '<div class="git-item"><span class="gi">\u2022</span>' + c + '</div>').join('') +
-      '</div>'
+    // Work units
+    const units=buildWorkUnits(ch.slug)
+    let wuHtml=''
+    if(units.length>0){
+      wuHtml='<div class="work-units">'+units.slice(0,10).map(u=>{
+        let html='<div class="wu">'
+        if(u.req){
+          html+='<div class="wu-req"><div class="wu-req-text">'+u.req.preview+'</div>'+
+            '<div class="wu-req-meta"><span>'+u.req.user+'</span><span>'+hm(u.req.time)+' ('+ta(u.req.time)+')</span></div></div>'
+        }
+        if(u.responses.length>0){
+          u.responses.forEach(r=>{
+            html+='<div class="wu-resp"><div class="wu-resp-text">\u{1F916} '+trunc(r.preview,200)+'</div>'+
+              '<div class="wu-resp-meta">'+hm(r.time)+'</div></div>'
+          })
+        } else if(u.req){
+          html+='<div class="wu-no-resp">응답 대기중...</div>'
+        }
+        html+='</div>'
+        return html
+      }).join('')+'</div>'
+    } else {
+      wuHtml='<div class="empty">이 기간에 대화 없음</div>'
     }
 
-    // Open PRs
-    let prHtml = ''
-    if (gh && gh.openPRs && gh.openPRs.length > 0) {
-      prHtml = '<div class="git-section"><div class="git-header">진행중 PR</div>' +
-        gh.openPRs.slice(0, 3).map(pr => '<div class="git-item"><span class="pr-badge open">PR #' + pr.number + '</span>' + pr.title + '</div>').join('') +
-      '</div>'
+    // Git activity
+    let gitHtml=''
+    if(gh){
+      if(gh.recentCommits&&gh.recentCommits.length>0){
+        gitHtml+='<div class="git-section"><div class="git-hdr">오늘 작업 내역</div>'+
+          gh.recentCommits.slice(0,5).map(c=>'<div class="git-item"><span style="color:#484f58">\u2022</span>'+c+'</div>').join('')+'</div>'
+      }
+      if(gh.openPRs&&gh.openPRs.length>0){
+        gitHtml+='<div class="git-section"><div class="git-hdr">진행중 PR</div>'+
+          gh.openPRs.map(p=>'<div class="git-item"><span class="pr-tag open">#'+p.number+'</span>'+p.title+'</div>').join('')+'</div>'
+      }
+      if(gh.mergedPRs&&gh.mergedPRs.length>0){
+        gitHtml+='<div class="git-section"><div class="git-hdr">완료된 PR</div>'+
+          gh.mergedPRs.slice(0,3).map(p=>'<div class="git-item"><span class="pr-tag merged">#'+p.number+'</span>'+p.title+' <span style="color:#484f58">'+ta(new Date(p.mergedAt).getTime())+'</span></div>').join('')+'</div>'
+      }
     }
 
-    return '<div class="card ' + st + '">' +
-      '<div class="card-top">' +
-        '<div class="card-title"><span class="card-icon">' + icon + '</span><a href="' + discordLink + '" target="_blank">' + ch.name + '</a></div>' +
-        '<span class="badge ' + st + p + '">' + stKr + '</span>' +
-      '</div>' +
-      taskHtml + agentHtml + statsHtml + ctxHtml + commitsHtml + prHtml +
+    return '<div class="'+cls+'" id="panel-'+ch.slug+'">'+
+      '<div class="panel-hdr" onclick="togglePanel(\''+ch.slug+'\')">'+
+        '<div class="panel-title"><span class="icon">'+icon+'</span>'+ch.name+
+          '<a class="dc-link" href="'+dcLink+'" target="_blank" onclick="event.stopPropagation()">\u{1F517} Discord</a>'+
+        '</div>'+
+        '<div class="panel-meta">'+
+          (tags||'')+
+          '<span class="panel-arrow">\u25B6</span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="panel-body"><div class="panel-inner">'+
+        statsHtml+ctxHtml+wuHtml+gitHtml+
+      '</div></div>'+
     '</div>'
   }).join('')
 }
 
-function renderTimeline() {
-  const el = document.getElementById('timeline')
-  const msgs = status.recentMessages
-  if (!msgs || !msgs.length) { el.innerHTML = '<div class="empty">메시지 대기중...</div>'; return }
-  el.innerHTML = msgs.map(m => {
-    const icon = ICONS[m.slug] || '\u{1F4C2}'
-    const isReply = m.isReply || m.user === 'Claude'
-    const userClass = isReply ? 'tl-bot' : 'tl-user'
-    const prefix = isReply ? '\u{1F916} ' : ''
-    return '<div class="tl-item' + (isReply ? ' tl-reply' : '') + '">' +
-      '<span class="tl-time">' + hm(m.time) + '</span>' +
-      '<span class="tl-ch">' + icon + ' ' + m.channel + '</span>' +
-      '<span class="' + userClass + '">' + prefix + m.user + '</span>' +
-      '<span class="tl-text">' + m.preview + '</span></div>'
-  }).join('')
+function togglePanel(slug){
+  if(openPanels.has(slug))openPanels.delete(slug);else openPanels.add(slug)
+  render()
 }
 
-function renderCompleted() {
-  const el = document.getElementById('completed')
-  const items = []
-  for (const slug in mon) {
-    const gh = mon[slug]?.github
-    if (!gh || !gh.mergedPRs) continue
-    gh.mergedPRs.forEach(pr => {
-      items.push({ name: mon[slug].name, icon: ICONS[slug] || '\u{1F4C2}', ...pr })
-    })
-  }
-  items.sort((a, b) => new Date(b.mergedAt) - new Date(a.mergedAt))
-  if (!items.length) { el.innerHTML = '<div class="empty">완료된 PR 없음</div>'; return }
-  el.innerHTML = items.slice(0, 10).map(it =>
-    '<div class="done-item"><div class="done-title">' + it.icon + ' <span class="pr-badge merged">PR #' + it.number + '</span> ' + it.title + '</div>' +
-    '<div class="done-meta">' + it.name + ' · ' + timeAgo(new Date(it.mergedAt).getTime()) + '</div></div>'
-  ).join('')
+function updateGlobal(){
+  const d=document.getElementById('gdot'),t=document.getElementById('gtxt')
+  const on=sts.channels.filter(c=>c.online).length,tot=sts.channels.length
+  const wrk=Object.values(mon).filter(m=>m.state==='working'||m.state==='thinking').length
+  if(on===0){d.className='dot r';t.textContent='전체 오프라인'}
+  else if(wrk>0){d.className='dot b pulse';t.textContent=wrk+'개 작업중'}
+  else if(on===tot){d.className='dot g';t.textContent='전체 온라인'}
+  else{d.className='dot y';t.textContent=on+'/'+tot+' 온라인'}
+  document.getElementById('uptime').textContent=up(sts.uptime)
 }
 
-function updateGlobal() {
-  const dot = document.getElementById('gdot'), txt = document.getElementById('gtxt')
-  const chs = status.channels
-  const on = chs.filter(c => c.online).length
-  const wrk = Object.values(mon).filter(m => m.state === 'working' || m.state === 'thinking').length
-  if (on === 0) { dot.className = 'dot red'; txt.textContent = '전체 오프라인' }
-  else if (wrk > 0) { dot.className = 'dot blue pulse'; txt.textContent = wrk + '개 작업중' }
-  else if (on === chs.length) { dot.className = 'dot green'; txt.textContent = '전체 온라인' }
-  else { dot.className = 'dot yellow'; txt.textContent = on + '/' + chs.length + ' 온라인' }
-  document.getElementById('uptime').textContent = uptime(status.uptime)
-}
+function render(){renderAlerts();renderExec();renderPanels();updateGlobal()}
 
-async function refresh() {
-  try {
-    const [s, m] = await Promise.all([
-      fetch('/api/status').then(r => r.json()).catch(() => null),
-      fetch('http://127.0.0.1:8899/api/monitor').then(r => r.json()).catch(() => ({})),
+async function refresh(){
+  try{
+    const[s,m]=await Promise.all([
+      fetch('/api/status').then(r=>r.json()).catch(()=>null),
+      fetch('http://127.0.0.1:8899/api/monitor').then(r=>r.json()).catch(()=>({}))
     ])
-    if (s) status = s
-    mon = m || {}
-    renderAlerts()
-    renderCards()
-    renderTimeline()
-    renderCompleted()
-    updateGlobal()
-  } catch {
-    document.getElementById('gdot').className = 'dot red'
-    document.getElementById('gtxt').textContent = '연결 끊김'
+    if(s)sts=s;mon=m||{};render()
+  }catch{
+    document.getElementById('gdot').className='dot r'
+    document.getElementById('gtxt').textContent='연결 끊김'
   }
 }
-setInterval(refresh, 5000)
-refresh()
+setInterval(refresh,5000);refresh()
 </script>
 </body>
 </html>

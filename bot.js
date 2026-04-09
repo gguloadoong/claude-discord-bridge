@@ -39,7 +39,7 @@ const DASHBOARD_PORT = parseInt(process.env.DASHBOARD_PORT || '8800')
 
 const channelActivity = new Map()
 const recentMessages = [] // rolling buffer, max 50
-const MAX_RECENT = 50
+const MAX_RECENT = 200
 
 function recordMessage(channelId, user, content) {
   const entry = channelActivity.get(channelId) || { messagesToday: 0, errors: 0 }
@@ -287,11 +287,50 @@ const dashboardServer = createServer(async (req, res) => {
     })
     res.end(JSON.stringify({
       channels,
-      recentMessages: recentMessages.slice(0, 30),
+      recentMessages: recentMessages.slice(0, 100),
       uptime: process.uptime(),
       timestamp: Date.now(),
       guildId: config.guild_id || '',
     }))
+    return
+  }
+
+  // Summary API — generates text summary for Discord
+  if (req.url === '/api/summary') {
+    const lines = ['**📋 상황 보고**', '']
+    const icons = { market: '📊', shorts: '🎬', general: '🏠' }
+    for (const [id, info] of channelMap) {
+      const act = channelActivity.get(id) || {}
+      const online = serverHealth.get(id) !== false
+      const icon = icons[info.slug] || '📂'
+      const status = online ? '🟢' : '🔴'
+      let line = `${status} **${icon} ${info.name}**`
+      if (act.messagesToday > 0) line += ` — 메시지 ${act.messagesToday}건`
+      if (act.lastMessage) line += `, 마지막: "${act.lastMessage.preview.slice(0, 50)}"`
+      lines.push(line)
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ text: lines.join('\n') }))
+    return
+  }
+
+  // Trigger summary send to general channel
+  if (req.url === '/api/send-summary' && req.method === 'POST') {
+    const generalId = Object.entries(config.channels).find(([, v]) => v.slug === 'general')?.[0]
+    if (generalId) {
+      const summaryRes = await fetch(`http://127.0.0.1:${DASHBOARD_PORT}/api/summary`)
+      const { text } = await summaryRes.json()
+      await fetch(`https://discord.com/api/v10/channels/${generalId}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bot ${BOT_TOKEN}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: text }),
+      })
+      res.writeHead(200)
+      res.end('sent')
+    } else {
+      res.writeHead(404)
+      res.end('no general channel')
+    }
     return
   }
 
