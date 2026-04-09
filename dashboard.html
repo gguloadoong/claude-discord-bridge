@@ -3,346 +3,537 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Control Room</title>
+<title>CONTROL ROOM</title>
 <style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0c10;color:#e1e4e8;min-height:100vh}
+:root{
+  --bg-0:#06080c;--bg-1:#0a0d12;--bg-2:#0f1319;--bg-3:#141820;
+  --border:#1a1f2a;--border-hi:#252b38;
+  --text-0:#e8ecf1;--text-1:#a4adb8;--text-2:#6b7585;--text-3:#3d4555;
+  --blue:#3b8eea;--blue-dim:#1a2d4a;
+  --green:#2dd4a0;--green-dim:#0d2e25;
+  --amber:#e8a830;--amber-dim:#2a2010;
+  --red:#ef5350;--red-dim:#2a1215;
+  --purple:#a78bfa;--purple-dim:#1e1533;
+  --cyan:#22d3ee;
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Noto Sans KR',system-ui,sans-serif;
+}
 
-/* Header */
-.hdr{background:#12151a;border-bottom:1px solid #1e2228;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
-.hdr h1{font-size:15px;font-weight:600;color:#58a6ff;letter-spacing:0.5px}
-.hdr-r{display:flex;align-items:center;gap:14px;font-size:12px;color:#6e7681}
-.dot{width:7px;height:7px;border-radius:50%;display:inline-block}
-.dot.g{background:#3fb950;box-shadow:0 0 8px #3fb95060}.dot.b{background:#58a6ff;box-shadow:0 0 8px #58a6ff60}
-.dot.y{background:#d29922;box-shadow:0 0 8px #d2992260}.dot.r{background:#f85149;box-shadow:0 0 8px #f8514960}
-.dot.x{background:#3d424a}
+html,body{height:100%;overflow:hidden;font-family:var(--sans);background:var(--bg-0);color:var(--text-0)}
 
-/* Time filter */
-.time-bar{padding:10px 20px;display:flex;gap:6px;align-items:center}
-.time-btn{background:#161b22;border:1px solid #21262d;color:#8b949e;padding:4px 12px;border-radius:6px;font-size:11px;cursor:pointer;transition:all .15s}
-.time-btn:hover{border-color:#58a6ff60;color:#c9d1d9}
-.time-btn.active{background:#1f3a5f;border-color:#58a6ff;color:#58a6ff}
-.time-label{font-size:11px;color:#484f58;margin-right:6px}
+/* ===== TOP BAR ===== */
+.topbar{
+  height:40px;background:var(--bg-1);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;padding:0 20px;
+  flex-shrink:0;
+}
+.topbar-left{display:flex;align-items:center;gap:16px}
+.topbar-title{
+  font-family:var(--mono);font-size:11px;font-weight:600;
+  letter-spacing:3px;color:var(--text-2);text-transform:uppercase;
+}
+.topbar-divider{width:1px;height:16px;background:var(--border)}
+.topbar-indicator{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-2)}
+.topbar-right{display:flex;align-items:center;gap:16px;font-family:var(--mono);font-size:11px;color:var(--text-2)}
+.topbar-clock{color:var(--text-1);font-weight:500;font-size:12px;letter-spacing:1px}
 
-/* Alerts */
-.alerts{padding:0 20px}
-.alert{padding:8px 14px;border-radius:6px;font-size:12px;display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.alert.r{background:#2a1215;border:1px solid #f8514930;color:#f85149}
-.alert.y{background:#2a2000;border:1px solid #d2992230;color:#d29922}
+/* Status dot */
+.sd{width:6px;height:6px;border-radius:50%;display:inline-block;flex-shrink:0}
+.sd.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+.sd.work{background:var(--blue);box-shadow:0 0 8px var(--blue)}
+.sd.think{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.sd.off{background:var(--red);box-shadow:0 0 6px var(--red)}
+.sd.idle{background:var(--text-3)}
 
-/* Executive summary */
-.exec{padding:10px 20px;display:flex;gap:10px;flex-wrap:wrap}
-.exec-chip{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:8px 14px;font-size:12px;display:flex;align-items:center;gap:8px;flex:1;min-width:200px;cursor:pointer;transition:all .15s}
-.exec-chip:hover{border-color:#58a6ff40;background:#1c2128}
-.exec-chip .icon{font-size:16px}
-.exec-chip .name{font-weight:600;color:#c9d1d9}
-.exec-chip .summary{color:#8b949e;flex:1}
-.exec-chip .st{font-size:11px;padding:2px 7px;border-radius:5px;font-weight:500}
-.exec-chip .st.working{background:#1f3a5f;color:#58a6ff}.exec-chip .st.thinking{background:#3b2e00;color:#d29922}
-.exec-chip .st.idle{background:#1c2128;color:#6e7681}.exec-chip .st.offline{background:#2a1215;color:#f85149}
+/* ===== ALERTS STRIP ===== */
+.alerts-strip{
+  flex-shrink:0;display:flex;gap:8px;padding:6px 20px;
+  background:var(--bg-0);min-height:0;
+}
+.alerts-strip:empty{display:none;padding:0}
+.alert-pill{
+  font-size:10px;font-family:var(--mono);padding:3px 10px;border-radius:4px;
+  display:flex;align-items:center;gap:5px;white-space:nowrap;
+}
+.alert-pill.err{background:var(--red-dim);color:var(--red);border:1px solid #f8514920}
+.alert-pill.warn{background:var(--amber-dim);color:var(--amber);border:1px solid #e8a83020}
 
-/* Project panels */
-.panels{padding:8px 20px 20px}
-.panel{background:#12151a;border:1px solid #1e2228;border-radius:10px;margin-bottom:10px;overflow:hidden;transition:all .2s}
-.panel.open{border-color:#58a6ff30}
-.panel-hdr{padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none}
-.panel-hdr:hover{background:#161b22}
-.panel-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600}
-.panel-title .icon{font-size:16px}
-.panel-meta{display:flex;align-items:center;gap:10px;font-size:11px;color:#6e7681}
-.panel-arrow{color:#484f58;transition:transform .2s;font-size:12px}
-.panel.open .panel-arrow{transform:rotate(90deg)}
-.panel-body{max-height:0;overflow:hidden;transition:max-height .3s ease-out}
-.panel.open .panel-body{max-height:2000px;transition:max-height .5s ease-in}
-.panel-inner{padding:0 16px 16px}
+/* ===== 3-COLUMN GRID ===== */
+.grid{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;
+  flex:1;overflow:hidden;min-height:0;
+}
+.col{
+  display:flex;flex-direction:column;overflow:hidden;
+  border-right:1px solid var(--border);
+}
+.col:last-child{border-right:none}
 
-/* Live status row */
-.live-row{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.live-tag{font-size:11px;padding:3px 8px;border-radius:5px;display:inline-flex;align-items:center;gap:4px}
-.live-tag.agent{background:#1f3a5f;color:#58a6ff}
-.live-tag.tool{background:#1c2128;color:#8b949e}
-.live-tag.branch{background:#1a2332;color:#79c0ff}
-.live-tag.ctx{background:#1c2128;color:#6e7681}
+/* Column header */
+.col-hdr{
+  flex-shrink:0;padding:12px 16px 10px;
+  background:var(--bg-1);border-bottom:1px solid var(--border);
+}
+.col-hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.col-name{display:flex;align-items:center;gap:8px}
+.col-icon{font-size:16px}
+.col-title{font-size:14px;font-weight:700;letter-spacing:-0.2px}
+.col-status{
+  font-family:var(--mono);font-size:10px;font-weight:600;
+  padding:2px 8px;border-radius:3px;text-transform:uppercase;letter-spacing:1px;
+}
+.col-status.working{background:var(--blue-dim);color:var(--blue)}
+.col-status.thinking{background:var(--amber-dim);color:var(--amber)}
+.col-status.idle{background:var(--bg-3);color:var(--text-3)}
+.col-status.offline{background:var(--red-dim);color:var(--red)}
 
-/* Stats row */
-.stats-row{display:flex;gap:6px;margin-bottom:12px}
-.s-box{background:#0d1017;border-radius:6px;padding:7px 10px;flex:1;text-align:center}
-.s-val{font-size:17px;font-weight:700}.s-lbl{font-size:9px;color:#484f58;text-transform:uppercase;letter-spacing:.5px;margin-top:1px}
-.s-val.err{color:#f85149}
+/* Stats strip */
+.col-stats{display:flex;gap:2px}
+.col-stat{
+  flex:1;background:var(--bg-2);padding:5px 6px;text-align:center;
+  border-radius:3px;
+}
+.col-stat:first-child{border-radius:3px 0 0 3px}
+.col-stat:last-child{border-radius:0 3px 3px 0}
+.cs-val{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--text-0);line-height:1}
+.cs-val.err{color:var(--red)}
+.cs-lbl{font-size:8px;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;font-family:var(--mono)}
 
-/* Work units */
-.work-units{display:flex;flex-direction:column;gap:8px}
-.wu{background:#0d1017;border-radius:8px;border:1px solid #1a1e24;overflow:hidden}
-.wu-req{padding:10px 12px;border-bottom:1px solid #1a1e24}
-.wu-req-text{font-size:13px;color:#c9d1d9;line-height:1.5}
-.wu-req-meta{font-size:11px;color:#484f58;margin-top:4px;display:flex;gap:10px}
-.wu-resp{padding:10px 12px;background:#0f1218}
-.wu-resp-text{font-size:12px;color:#8b949e;line-height:1.5}
-.wu-resp-meta{font-size:10px;color:#484f58;margin-top:3px}
-.wu-no-resp{padding:6px 12px;font-size:11px;color:#484f58;font-style:italic}
+/* Live bar (agent/tool) */
+.live-bar{
+  flex-shrink:0;padding:6px 16px;background:var(--bg-2);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:6px;min-height:28px;flex-wrap:wrap;
+}
+.live-bar:empty{display:none}
+.ltag{
+  font-family:var(--mono);font-size:9px;padding:2px 6px;border-radius:3px;
+  display:inline-flex;align-items:center;gap:3px;white-space:nowrap;
+}
+.ltag.agent{background:var(--blue-dim);color:var(--blue)}
+.ltag.tool{background:var(--bg-3);color:var(--text-1)}
+.ltag.branch{background:#0d1f2e;color:var(--cyan)}
+.ltag.ctx{background:var(--bg-3);color:var(--text-2)}
 
-/* Git section in panel */
-.git-section{margin-top:12px;padding-top:10px;border-top:1px solid #1a1e24}
-.git-hdr{font-size:10px;color:#484f58;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
-.git-item{font-size:12px;color:#8b949e;padding:2px 0;display:flex;gap:6px}
-.pr-tag{font-size:10px;padding:1px 5px;border-radius:4px}
-.pr-tag.open{background:#1a4d2e;color:#3fb950}.pr-tag.merged{background:#2a1a4d;color:#a371f7}
+/* Context gauge */
+.ctx-gauge{display:flex;align-items:center;gap:4px;font-family:var(--mono);font-size:9px;color:var(--text-3)}
+.ctx-track{width:40px;height:3px;background:var(--bg-0);border-radius:2px;overflow:hidden}
+.ctx-fill{height:100%;border-radius:2px;transition:width .5s ease}
+.ctx-fill.lo{background:var(--green)}.ctx-fill.md{background:var(--amber)}.ctx-fill.hi{background:var(--red)}
 
-/* Context bar */
-.ctx-bar-wrap{display:flex;align-items:center;gap:6px;font-size:11px;color:#484f58;margin-top:8px}
-.ctx-bar{flex:1;height:3px;background:#1a1e24;border-radius:2px}
-.ctx-fill{height:100%;border-radius:2px;transition:width .5s}
-.ctx-fill.lo{background:#3fb950}.ctx-fill.md{background:#d29922}.ctx-fill.hi{background:#f85149}
+/* ===== SCROLLABLE CONTENT ===== */
+.col-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+.col-body::-webkit-scrollbar{width:4px}
+.col-body::-webkit-scrollbar-track{background:transparent}
+.col-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.col-body::-webkit-scrollbar-thumb:hover{background:var(--border-hi)}
 
-/* Empty */
-.empty{text-align:center;padding:20px;color:#3d424a;font-size:12px}
+/* Work unit — request/response pair */
+.wu{background:var(--bg-2);border-radius:6px;border:1px solid var(--border);overflow:hidden}
+.wu-req{padding:8px 10px;border-left:3px solid var(--blue)}
+.wu-req-text{font-size:12px;color:var(--text-0);line-height:1.5}
+.wu-req-meta{display:flex;justify-content:space-between;margin-top:3px}
+.wu-req-user{font-family:var(--mono);font-size:9px;color:var(--blue);font-weight:500}
+.wu-req-time{font-family:var(--mono);font-size:9px;color:var(--text-3)}
+.wu-resp{padding:8px 10px;background:var(--bg-1);border-left:3px solid var(--green-dim)}
+.wu-resp-text{font-size:11px;color:var(--text-1);line-height:1.5}
+.wu-resp-meta{font-family:var(--mono);font-size:9px;color:var(--text-3);margin-top:2px}
+.wu-pending{
+  padding:5px 10px;font-family:var(--mono);font-size:10px;
+  color:var(--amber);background:var(--amber-dim);
+  display:flex;align-items:center;gap:5px;
+}
+.wu-pending .spinner{display:inline-block;width:8px;height:8px;border:1.5px solid var(--amber);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite}
 
-/* Pulse */
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-.pulse{animation:pulse 2s ease-in-out infinite}
+/* Git section */
+.git-section{background:var(--bg-2);border-radius:6px;border:1px solid var(--border);padding:8px 10px}
+.git-hdr{font-family:var(--mono);font-size:9px;color:var(--text-3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;display:flex;align-items:center;gap:5px}
+.git-item{font-size:11px;color:var(--text-1);padding:2px 0;display:flex;align-items:baseline;gap:5px;line-height:1.4}
+.git-bullet{color:var(--text-3);flex-shrink:0}
+.pr-tag{font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:3px;flex-shrink:0}
+.pr-tag.open{background:var(--green-dim);color:var(--green)}
+.pr-tag.merged{background:var(--purple-dim);color:var(--purple)}
+.issue-tag{font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:3px;background:var(--amber-dim);color:var(--amber)}
 
-/* Discord link */
-.dc-link{font-size:11px;color:#5865F2;text-decoration:none;display:inline-flex;align-items:center;gap:3px}
-.dc-link:hover{text-decoration:underline}
+/* Discord link in header */
+.dc-link{
+  font-family:var(--mono);font-size:9px;color:#5865F2;text-decoration:none;
+  padding:1px 5px;border-radius:3px;background:#5865F215;
+  transition:background .15s;
+}
+.dc-link:hover{background:#5865F230}
+
+/* Empty state */
+.empty-state{
+  display:flex;align-items:center;justify-content:center;
+  flex:1;color:var(--text-3);font-size:12px;
+}
+
+/* Section label inside col */
+.sec-label{
+  font-family:var(--mono);font-size:9px;color:var(--text-3);
+  text-transform:uppercase;letter-spacing:1px;padding:4px 2px 2px;
+}
+
+/* ===== BOTTOM BAR ===== */
+.bottombar{
+  flex-shrink:0;height:28px;background:var(--bg-1);border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;padding:0 20px;
+  font-family:var(--mono);font-size:10px;color:var(--text-3);
+}
+.bottombar-left{display:flex;align-items:center;gap:16px}
+.bottombar-right{display:flex;align-items:center;gap:12px}
+.refresh-dot{width:4px;height:4px;border-radius:50%;background:var(--green);opacity:0;transition:opacity .3s}
+.refresh-dot.flash{opacity:1}
+
+/* ===== ANIMATIONS ===== */
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse-glow{0%,100%{opacity:1}50%{opacity:.4}}
+.pulse{animation:pulse-glow 2s ease-in-out infinite}
+@keyframes slide-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.wu{animation:slide-in .2s ease-out}
+
+/* ===== TIME FILTER (minimal strip) ===== */
+.filter-strip{
+  flex-shrink:0;display:flex;align-items:center;gap:4px;padding:4px 20px;
+  background:var(--bg-0);border-bottom:1px solid var(--border);
+}
+.filter-label{font-family:var(--mono);font-size:9px;color:var(--text-3);letter-spacing:1px;text-transform:uppercase;margin-right:4px}
+.fbtn{
+  font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;
+  border:1px solid transparent;background:transparent;color:var(--text-2);
+  cursor:pointer;transition:all .1s;
+}
+.fbtn:hover{color:var(--text-1);background:var(--bg-2)}
+.fbtn.on{background:var(--blue-dim);border-color:var(--blue);color:var(--blue)}
+
+/* ===== LAYOUT SHELL ===== */
+.shell{display:flex;flex-direction:column;height:100vh;overflow:hidden}
 </style>
 </head>
 <body>
 
-<div class="hdr">
-  <h1>CONTROL ROOM</h1>
-  <div class="hdr-r">
-    <span id="uptime">--</span>
-    <div style="display:flex;align-items:center;gap:5px"><span class="dot x" id="gdot"></span><span id="gtxt">...</span></div>
+<div class="shell">
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-title">Control Room</span>
+      <div class="topbar-divider"></div>
+      <div class="topbar-indicator">
+        <span class="sd idle" id="g-dot"></span>
+        <span id="g-status">--</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="g-uptime">--</span>
+      <div class="topbar-divider"></div>
+      <span class="topbar-clock" id="g-clock">--:--:--</span>
+    </div>
+  </div>
+
+  <!-- ALERTS -->
+  <div class="alerts-strip" id="alerts"></div>
+
+  <!-- TIME FILTER -->
+  <div class="filter-strip">
+    <span class="filter-label">Period</span>
+    <button class="fbtn" data-h="1">1h</button>
+    <button class="fbtn" data-h="3">3h</button>
+    <button class="fbtn on" data-h="24">Today</button>
+    <button class="fbtn" data-h="0">All</button>
+  </div>
+
+  <!-- 3-COLUMN GRID -->
+  <div class="grid" id="grid"></div>
+
+  <!-- BOTTOM BAR -->
+  <div class="bottombar">
+    <div class="bottombar-left">
+      <span><span class="refresh-dot" id="r-dot"></span> 5s auto-refresh</span>
+      <span id="b-msgs">--</span>
+    </div>
+    <div class="bottombar-right">
+      <span id="b-last">--</span>
+    </div>
   </div>
 </div>
 
-<div class="time-bar">
-  <span class="time-label">기간</span>
-  <button class="time-btn" data-h="1">1시간</button>
-  <button class="time-btn" data-h="3">3시간</button>
-  <button class="time-btn active" data-h="24">오늘</button>
-  <button class="time-btn" data-h="0">전체</button>
-</div>
-
-<div class="alerts" id="alerts"></div>
-<div class="exec" id="exec"></div>
-<div class="panels" id="panels"></div>
-
 <script>
-const ICONS={market:'\u{1F4CA}',shorts:'\u{1F3AC}',general:'\u{1F3E0}'}
-const ST_KR={working:'작업중',thinking:'생각중',idle:'대기',offline:'오프라인'}
-let mon={},sts={channels:[],recentMessages:[],uptime:0,guildId:''},filterH=24,openPanels=new Set()
+const PROJECTS = ['market', 'shorts', 'general']
+const ICONS = { market: '\u{1F4CA}', shorts: '\u{1F3AC}', general: '\u{1F3E0}' }
+const NAMES = { market: '\ub9c8\ucf13\ub808\uc774\ub354 v5', shorts: '\uc1fc\uce20', general: '\uc81c\ub108\ub7f4' }
+const ST_KR = { working: '\uc791\uc5c5\uc911', thinking: '\uc0dd\uac01\uc911', idle: '\ub300\uae30', offline: '\uc624\ud504\ub77c\uc778' }
 
-function ta(ts){if(!ts)return'';const s=Math.floor((Date.now()-ts)/1000);if(s<10)return'방금';if(s<60)return s+'초 전';const m=Math.floor(s/60);if(m<60)return m+'분 전';const h=Math.floor(m/60);if(h<24)return h+'시간 전';return Math.floor(h/24)+'일 전'}
-function hm(ts){const d=new Date(ts);return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')}
-function up(s){return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m'}
-function trunc(s,n){return s&&s.length>n?s.slice(0,n-1)+'…':s||''}
-function cutoff(){return filterH===0?0:Date.now()-filterH*3600*1000}
+let mon = {}, sts = { channels: [], recentMessages: [], uptime: 0, guildId: '' }, filterH = 24
 
-// Group messages into work units (request + response pairs)
-function buildWorkUnits(slug){
-  const msgs=(sts.recentMessages||[]).filter(m=>m.slug===slug&&m.time>=cutoff())
-  const units=[]
-  let i=0
-  while(i<msgs.length){
-    const m=msgs[i]
-    if(!m.isReply){
-      const unit={req:m,responses:[]}
+// --- Helpers ---
+function ta(ts) {
+  if (!ts) return ''
+  const s = Math.floor((Date.now() - ts) / 1000)
+  if (s < 10) return '\ubc29\uae08'
+  if (s < 60) return s + '\ucd08 \uc804'
+  const m = Math.floor(s / 60)
+  if (m < 60) return m + '\ubd84 \uc804'
+  const h = Math.floor(m / 60)
+  if (h < 24) return h + '\uc2dc\uac04 \uc804'
+  return Math.floor(h / 24) + '\uc77c \uc804'
+}
+function hm(ts) {
+  const d = new Date(ts)
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')
+}
+function up(s) { return Math.floor(s / 3600) + 'h ' + Math.floor((s % 3600) / 60) + 'm' }
+function trunc(s, n) { return s && s.length > n ? s.slice(0, n - 1) + '\u2026' : s || '' }
+function cutoff() { return filterH === 0 ? 0 : Date.now() - filterH * 3600 * 1000 }
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML }
+
+// --- Work units ---
+function buildWorkUnits(slug) {
+  const msgs = (sts.recentMessages || []).filter(m => m.slug === slug && m.time >= cutoff())
+  const units = []
+  let i = 0
+  while (i < msgs.length) {
+    const m = msgs[i]
+    if (!m.isReply) {
+      const unit = { req: m, responses: [] }
       i++
-      while(i<msgs.length&&msgs[i].isReply&&msgs[i].slug===slug){
-        unit.responses.push(msgs[i]);i++
+      while (i < msgs.length && msgs[i].isReply && msgs[i].slug === slug) {
+        unit.responses.push(msgs[i]); i++
       }
       units.push(unit)
     } else {
-      // Orphan response
-      units.push({req:null,responses:[m]});i++
+      units.push({ req: null, responses: [m] }); i++
     }
   }
-  return units.reverse() // newest first
+  return units.reverse()
 }
 
-// Time filter buttons
-document.querySelectorAll('.time-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    document.querySelectorAll('.time-btn').forEach(b=>b.classList.remove('active'))
-    btn.classList.add('active')
-    filterH=parseInt(btn.dataset.h)
+// --- Time filter ---
+document.querySelectorAll('.fbtn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.fbtn').forEach(b => b.classList.remove('on'))
+    btn.classList.add('on')
+    filterH = parseInt(btn.dataset.h)
     render()
   })
 })
 
-function renderAlerts(){
-  const el=document.getElementById('alerts')
-  const a=[]
-  sts.channels.forEach(ch=>{
-    const m=mon[ch.slug]||{}
-    if(!ch.online)a.push({l:'r',t:'\u{1F6A8} '+ch.name+' 서버 오프라인'})
-    if(m.context>80)a.push({l:'y',t:'\u26A0\uFE0F '+ch.name+' 컨텍스트 '+m.context+'% — 세션 재시작 필요'})
-    if(ch.errors>3)a.push({l:'y',t:'\u{1F4A5} '+ch.name+' 에러 '+ch.errors+'건'})
+// --- Clock ---
+function tickClock() {
+  const d = new Date()
+  document.getElementById('g-clock').textContent =
+    String(d.getHours()).padStart(2, '0') + ':' +
+    String(d.getMinutes()).padStart(2, '0') + ':' +
+    String(d.getSeconds()).padStart(2, '0')
+}
+setInterval(tickClock, 1000)
+tickClock()
+
+// --- Alerts ---
+function renderAlerts() {
+  const el = document.getElementById('alerts')
+  const pills = []
+  sts.channels.forEach(ch => {
+    const m = mon[ch.slug] || {}
+    if (!ch.online) pills.push({ c: 'err', t: ch.name + ' \uc11c\ubc84 \uc624\ud504\ub77c\uc778' })
+    if (m.context > 80) pills.push({ c: 'warn', t: ch.name + ' CTX ' + m.context + '% \u2014 \uc7ac\uc2dc\uc791 \ud544\uc694' })
+    if (ch.errors > 3) pills.push({ c: 'warn', t: ch.name + ' \uc5d0\ub7ec ' + ch.errors + '\uac74' })
   })
-  el.innerHTML=a.map(x=>'<div class="alert '+x.l+'">'+x.t+'</div>').join('')
+  el.innerHTML = pills.map(p => '<div class="alert-pill ' + p.c + '">' + esc(p.t) + '</div>').join('')
 }
 
-function renderExec(){
-  const el=document.getElementById('exec')
-  el.innerHTML=sts.channels.map((ch,idx)=>{
-    const m=mon[ch.slug]||{},gh=m.github||null
-    const icon=ICONS[ch.slug]||'\u{1F4C2}'
-    const st=!ch.online?'offline':(m.state||'idle')
-    const p=(st==='working'||st==='thinking')?' pulse':''
+// --- Render columns ---
+function renderGrid() {
+  const el = document.getElementById('grid')
+  const html = sts.channels.map(ch => {
+    const m = mon[ch.slug] || {}
+    const gh = m.github || null
+    const icon = ICONS[ch.slug] || '\u{1F4C2}'
+    const st = !ch.online ? 'offline' : (m.state || 'idle')
+    const pulseClass = (st === 'working' || st === 'thinking') ? ' pulse' : ''
+    const gid = sts.guildId
+    const dcLink = gid ? 'https://discord.com/channels/' + gid + '/' + ch.id : '#'
 
-    // One-line summary
-    let summary=''
-    if(st==='working'&&ch.lastMessage)summary=trunc(ch.lastMessage.preview,40)
-    else if(ch.lastMessage)summary='마지막: '+ta(ch.lastMessage.time)
-    else summary='대기중'
+    // --- Column header ---
+    let hdr = '<div class="col-hdr">'
+    hdr += '<div class="col-hdr-top">'
+    hdr += '<div class="col-name"><span class="col-icon">' + icon + '</span><span class="col-title">' + esc(ch.name) + '</span>'
+    hdr += ' <a class="dc-link" href="' + dcLink + '" target="_blank">Discord</a></div>'
+    hdr += '<span class="col-status ' + st + pulseClass + '">' + ST_KR[st] + '</span>'
+    hdr += '</div>'
 
-    // Quick stats
-    let quick=''
-    if(gh){
-      const parts=[]
-      if(gh.commitsToday>0)parts.push(gh.commitsToday+'커밋')
-      if(gh.openPRs&&gh.openPRs.length>0)parts.push(gh.openPRs.length+'PR')
-      if(gh.openIssues&&gh.openIssues.length>0)parts.push(gh.openIssues.length+'이슈')
-      if(parts.length)quick=' · '+parts.join(' · ')
+    // Stats strip
+    hdr += '<div class="col-stats">'
+    hdr += '<div class="col-stat"><div class="cs-val">' + ch.messagesToday + '</div><div class="cs-lbl">\uba54\uc2dc\uc9c0</div></div>'
+    hdr += '<div class="col-stat"><div class="cs-val' + (ch.errors > 0 ? ' err' : '') + '">' + ch.errors + '</div><div class="cs-lbl">\uc5d0\ub7ec</div></div>'
+    if (gh) {
+      hdr += '<div class="col-stat"><div class="cs-val">' + gh.commitsToday + '</div><div class="cs-lbl">\ucee4\ubc0b</div></div>'
+      hdr += '<div class="col-stat"><div class="cs-val">' + (gh.openPRs ? gh.openPRs.length : 0) + '</div><div class="cs-lbl">PR</div></div>'
+      hdr += '<div class="col-stat"><div class="cs-val">' + (gh.openIssues ? gh.openIssues.length : 0) + '</div><div class="cs-lbl">\uc774\uc288</div></div>'
+      if (gh.changedFiles > 0) {
+        hdr += '<div class="col-stat"><div class="cs-val" style="color:var(--amber)">' + gh.changedFiles + '</div><div class="cs-lbl">\ubcc0\uacbd</div></div>'
+      }
     }
+    hdr += '</div>'
+    hdr += '</div>'
 
-    return '<div class="exec-chip" onclick="togglePanel(\''+ch.slug+'\')">'+
-      '<span class="icon">'+icon+'</span>'+
-      '<span class="name">'+ch.name+'</span>'+
-      '<span class="summary">'+summary+quick+'</span>'+
-      '<span class="st '+st+p+'">'+ST_KR[st]+'</span>'+
-    '</div>'
-  }).join('')
-}
-
-function renderPanels(){
-  const el=document.getElementById('panels')
-  el.innerHTML=sts.channels.map(ch=>{
-    const m=mon[ch.slug]||{},gh=m.github||null
-    const icon=ICONS[ch.slug]||'\u{1F4C2}'
-    const st=!ch.online?'offline':(m.state||'idle')
-    const isOpen=openPanels.has(ch.slug)
-    const cls=isOpen?'panel open':'panel'
-    const gid=sts.guildId
-    const dcLink=gid?'https://discord.com/channels/'+gid+'/'+ch.id:'#'
-
-    // Live tags
-    let tags=''
-    if(m.agent)tags+='<span class="live-tag agent">\u2699 '+m.agent+'</span>'
-    if(m.tool)tags+='<span class="live-tag tool">\u{1F527} '+m.tool+(m.toolDetail?': '+trunc(m.toolDetail,25):'')+'</span>'
-    if(gh&&gh.branch&&gh.branch!=='main')tags+='<span class="live-tag branch">\u{1F33F} '+gh.branch+'</span>'
-    if(m.context!=null)tags+='<span class="live-tag ctx">CTX '+m.context+'%</span>'
-
-    // Stats
-    let statsHtml='<div class="stats-row">'
-    statsHtml+='<div class="s-box"><div class="s-val">'+ch.messagesToday+'</div><div class="s-lbl">메시지</div></div>'
-    statsHtml+='<div class="s-box"><div class="s-val'+(ch.errors>0?' err':'')+'">'+ch.errors+'</div><div class="s-lbl">에러</div></div>'
-    if(gh){
-      statsHtml+='<div class="s-box"><div class="s-val">'+gh.commitsToday+'</div><div class="s-lbl">커밋</div></div>'
-      statsHtml+='<div class="s-box"><div class="s-val">'+gh.openPRs.length+'</div><div class="s-lbl">PR</div></div>'
-      statsHtml+='<div class="s-box"><div class="s-val">'+gh.openIssues.length+'</div><div class="s-lbl">이슈</div></div>'
+    // --- Live bar ---
+    let live = '<div class="live-bar">'
+    let hasLive = false
+    if (m.agent) { live += '<span class="ltag agent">' + esc(m.agent) + '</span>'; hasLive = true }
+    if (m.tool) {
+      live += '<span class="ltag tool">' + esc(m.tool) + (m.toolDetail ? ': ' + esc(trunc(m.toolDetail, 20)) : '') + '</span>'
+      hasLive = true
     }
-    statsHtml+='</div>'
-
-    // Context bar
-    let ctxHtml=''
-    if(m.context!=null){
-      const cls2=m.context<50?'lo':m.context<80?'md':'hi'
-      ctxHtml='<div class="ctx-bar-wrap">컨텍스트 '+m.context+'%'+(m.session?' · 세션 '+m.session:'')+
-        '<div class="ctx-bar"><div class="ctx-fill '+cls2+'" style="width:'+m.context+'%"></div></div></div>'
+    if (gh && gh.branch && gh.branch !== 'main') {
+      live += '<span class="ltag branch">' + esc(gh.branch) + '</span>'
+      hasLive = true
     }
+    if (m.context != null) {
+      const cls = m.context < 50 ? 'lo' : m.context < 80 ? 'md' : 'hi'
+      live += '<div class="ctx-gauge">CTX <div class="ctx-track"><div class="ctx-fill ' + cls + '" style="width:' + m.context + '%"></div></div>' + m.context + '%</div>'
+      hasLive = true
+    }
+    if (m.session) {
+      live += '<span class="ltag ctx">' + esc(m.session) + '</span>'
+      hasLive = true
+    }
+    live += '</div>'
+    if (!hasLive) live = ''
 
-    // Work units
-    const units=buildWorkUnits(ch.slug)
-    let wuHtml=''
-    if(units.length>0){
-      wuHtml='<div class="work-units">'+units.slice(0,10).map(u=>{
-        let html='<div class="wu">'
-        if(u.req){
-          html+='<div class="wu-req"><div class="wu-req-text">'+u.req.preview+'</div>'+
-            '<div class="wu-req-meta"><span>'+u.req.user+'</span><span>'+hm(u.req.time)+' ('+ta(u.req.time)+')</span></div></div>'
+    // --- Body content ---
+    let body = '<div class="col-body">'
+
+    // Work units (conversations)
+    const units = buildWorkUnits(ch.slug)
+    if (units.length > 0) {
+      body += '<div class="sec-label">\ub300\ud654</div>'
+      units.slice(0, 5).forEach(u => {
+        body += '<div class="wu">'
+        if (u.req) {
+          body += '<div class="wu-req"><div class="wu-req-text">' + esc(u.req.preview) + '</div>'
+          body += '<div class="wu-req-meta"><span class="wu-req-user">' + esc(u.req.user) + '</span>'
+          body += '<span class="wu-req-time">' + hm(u.req.time) + ' \u00b7 ' + ta(u.req.time) + '</span></div></div>'
         }
-        if(u.responses.length>0){
-          u.responses.forEach(r=>{
-            html+='<div class="wu-resp"><div class="wu-resp-text">\u{1F916} '+trunc(r.preview,200)+'</div>'+
-              '<div class="wu-resp-meta">'+hm(r.time)+'</div></div>'
+        if (u.responses.length > 0) {
+          u.responses.forEach(r => {
+            body += '<div class="wu-resp"><div class="wu-resp-text">' + esc(trunc(r.preview, 150)) + '</div>'
+            body += '<div class="wu-resp-meta">' + hm(r.time) + '</div></div>'
           })
-        } else if(u.req){
-          html+='<div class="wu-no-resp">응답 대기중...</div>'
+        } else if (u.req) {
+          body += '<div class="wu-pending"><span class="spinner"></span> \uc751\ub2f5 \ub300\uae30\uc911\u2026</div>'
         }
-        html+='</div>'
-        return html
-      }).join('')+'</div>'
+        body += '</div>'
+      })
     } else {
-      wuHtml='<div class="empty">이 기간에 대화 없음</div>'
+      body += '<div class="empty-state">\uc774 \uae30\uac04\uc5d0 \ub300\ud654 \uc5c6\uc74c</div>'
     }
 
-    // Git activity
-    let gitHtml=''
-    if(gh){
-      if(gh.recentCommits&&gh.recentCommits.length>0){
-        gitHtml+='<div class="git-section"><div class="git-hdr">오늘 작업 내역</div>'+
-          gh.recentCommits.slice(0,5).map(c=>'<div class="git-item"><span style="color:#484f58">\u2022</span>'+c+'</div>').join('')+'</div>'
-      }
-      if(gh.openPRs&&gh.openPRs.length>0){
-        gitHtml+='<div class="git-section"><div class="git-hdr">진행중 PR</div>'+
-          gh.openPRs.map(p=>'<div class="git-item"><span class="pr-tag open">#'+p.number+'</span>'+p.title+'</div>').join('')+'</div>'
-      }
-      if(gh.mergedPRs&&gh.mergedPRs.length>0){
-        gitHtml+='<div class="git-section"><div class="git-hdr">완료된 PR</div>'+
-          gh.mergedPRs.slice(0,3).map(p=>'<div class="git-item"><span class="pr-tag merged">#'+p.number+'</span>'+p.title+' <span style="color:#484f58">'+ta(new Date(p.mergedAt).getTime())+'</span></div>').join('')+'</div>'
-      }
+    // Git: recent commits
+    if (gh && gh.recentCommits && gh.recentCommits.length > 0) {
+      body += '<div class="sec-label">\uc791\uc5c5 \ub0b4\uc5ed</div>'
+      body += '<div class="git-section">'
+      gh.recentCommits.slice(0, 4).forEach(c => {
+        body += '<div class="git-item"><span class="git-bullet">\u2022</span>' + esc(c) + '</div>'
+      })
+      body += '</div>'
     }
 
-    return '<div class="'+cls+'" id="panel-'+ch.slug+'">'+
-      '<div class="panel-hdr" onclick="togglePanel(\''+ch.slug+'\')">'+
-        '<div class="panel-title"><span class="icon">'+icon+'</span>'+ch.name+
-          '<a class="dc-link" href="'+dcLink+'" target="_blank" onclick="event.stopPropagation()">\u{1F517} Discord</a>'+
-        '</div>'+
-        '<div class="panel-meta">'+
-          (tags||'')+
-          '<span class="panel-arrow">\u25B6</span>'+
-        '</div>'+
-      '</div>'+
-      '<div class="panel-body"><div class="panel-inner">'+
-        statsHtml+ctxHtml+wuHtml+gitHtml+
-      '</div></div>'+
-    '</div>'
+    // Git: open PRs
+    if (gh && gh.openPRs && gh.openPRs.length > 0) {
+      body += '<div class="sec-label">\uc9c4\ud589\uc911 PR</div>'
+      body += '<div class="git-section">'
+      gh.openPRs.forEach(p => {
+        body += '<div class="git-item"><span class="pr-tag open">#' + p.number + '</span>' + esc(p.title) + '</div>'
+      })
+      body += '</div>'
+    }
+
+    // Git: merged PRs
+    if (gh && gh.mergedPRs && gh.mergedPRs.length > 0) {
+      body += '<div class="sec-label">\uc644\ub8cc PR</div>'
+      body += '<div class="git-section">'
+      gh.mergedPRs.slice(0, 3).forEach(p => {
+        body += '<div class="git-item"><span class="pr-tag merged">#' + p.number + '</span>' + esc(p.title) + '</div>'
+      })
+      body += '</div>'
+    }
+
+    // Git: open issues
+    if (gh && gh.openIssues && gh.openIssues.length > 0) {
+      body += '<div class="sec-label">\uc5f4\ub9b0 \uc774\uc288</div>'
+      body += '<div class="git-section">'
+      gh.openIssues.slice(0, 4).forEach(issue => {
+        body += '<div class="git-item"><span class="issue-tag">#' + issue.number + '</span>' + esc(issue.title) + '</div>'
+      })
+      body += '</div>'
+    }
+
+    body += '</div>'
+
+    return '<div class="col">' + hdr + live + body + '</div>'
   }).join('')
+
+  el.innerHTML = html
 }
 
-function togglePanel(slug){
-  if(openPanels.has(slug))openPanels.delete(slug);else openPanels.add(slug)
-  render()
-}
+// --- Global status ---
+function updateGlobal() {
+  const dot = document.getElementById('g-dot')
+  const txt = document.getElementById('g-status')
+  const on = sts.channels.filter(c => c.online).length
+  const tot = sts.channels.length
+  const wrk = Object.values(mon).filter(m => m.state === 'working' || m.state === 'thinking').length
 
-function updateGlobal(){
-  const d=document.getElementById('gdot'),t=document.getElementById('gtxt')
-  const on=sts.channels.filter(c=>c.online).length,tot=sts.channels.length
-  const wrk=Object.values(mon).filter(m=>m.state==='working'||m.state==='thinking').length
-  if(on===0){d.className='dot r';t.textContent='전체 오프라인'}
-  else if(wrk>0){d.className='dot b pulse';t.textContent=wrk+'개 작업중'}
-  else if(on===tot){d.className='dot g';t.textContent='전체 온라인'}
-  else{d.className='dot y';t.textContent=on+'/'+tot+' 온라인'}
-  document.getElementById('uptime').textContent=up(sts.uptime)
-}
+  if (on === 0) { dot.className = 'sd off'; txt.textContent = '\uc804\uccb4 \uc624\ud504\ub77c\uc778' }
+  else if (wrk > 0) { dot.className = 'sd work pulse'; txt.textContent = wrk + '\uac1c \uc791\uc5c5\uc911' }
+  else if (on === tot) { dot.className = 'sd on'; txt.textContent = '\uc804\uccb4 \uc628\ub77c\uc778' }
+  else { dot.className = 'sd think'; txt.textContent = on + '/' + tot + ' \uc628\ub77c\uc778' }
 
-function render(){renderAlerts();renderExec();renderPanels();updateGlobal()}
+  document.getElementById('g-uptime').textContent = 'UP ' + up(sts.uptime)
 
-async function refresh(){
-  try{
-    const[s,m]=await Promise.all([
-      fetch('/api/status').then(r=>r.json()).catch(()=>null),
-      fetch('http://127.0.0.1:8899/api/monitor').then(r=>r.json()).catch(()=>({}))
-    ])
-    if(s)sts=s;mon=m||{};render()
-  }catch{
-    document.getElementById('gdot').className='dot r'
-    document.getElementById('gtxt').textContent='연결 끊김'
+  // Bottom bar
+  const totalMsgs = sts.channels.reduce((a, c) => a + (c.messagesToday || 0), 0)
+  document.getElementById('b-msgs').textContent = '\uc624\ub298 \uba54\uc2dc\uc9c0 ' + totalMsgs + '\uac74'
+
+  const allLast = sts.channels.map(c => c.lastMessage?.time || 0).filter(Boolean)
+  if (allLast.length) {
+    document.getElementById('b-last').textContent = '\ub9c8\uc9c0\ub9c9 \ud65c\ub3d9 ' + ta(Math.max(...allLast))
   }
 }
-setInterval(refresh,5000);refresh()
+
+function render() {
+  renderAlerts()
+  renderGrid()
+  updateGlobal()
+}
+
+// --- Fetch data ---
+async function refresh() {
+  try {
+    const [s, m] = await Promise.all([
+      fetch('/api/status').then(r => r.json()).catch(() => null),
+      fetch('http://127.0.0.1:8899/api/monitor').then(r => r.json()).catch(() => ({}))
+    ])
+    if (s) sts = s
+    mon = m || {}
+    render()
+
+    // Flash refresh indicator
+    const rd = document.getElementById('r-dot')
+    rd.classList.add('flash')
+    setTimeout(() => rd.classList.remove('flash'), 600)
+  } catch {
+    document.getElementById('g-dot').className = 'sd off'
+    document.getElementById('g-status').textContent = '\uc5f0\uacb0 \ub04a\uae40'
+  }
+}
+
+setInterval(refresh, 5000)
+refresh()
 </script>
 </body>
 </html>

@@ -163,6 +163,38 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
+      name: 'reply_embed',
+      description: 'Send a rich embed message to the Discord channel (colored sidebar, title, fields, footer)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          chat_id: { type: 'string', description: 'Discord channel ID (from chat_id attribute)' },
+          reply_to: { type: 'string', description: 'Message ID to reply to (optional)' },
+          text: { type: 'string', description: 'Plain text content above the embed (optional)' },
+          title: { type: 'string', description: 'Embed title' },
+          description: { type: 'string', description: 'Embed description (supports markdown)' },
+          color: { type: 'number', description: 'Embed sidebar color as decimal (e.g. 3447003 for blue, 15158332 for red, 3066993 for green, 16776960 for yellow). Default: 3447003' },
+          fields: {
+            type: 'array',
+            description: 'Embed fields',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: 'Field name (bold header)' },
+                value: { type: 'string', description: 'Field value (supports markdown)' },
+                inline: { type: 'boolean', description: 'Show side-by-side (default false)' },
+              },
+              required: ['name', 'value'],
+            },
+          },
+          footer: { type: 'string', description: 'Footer text (optional)' },
+          thumbnail: { type: 'string', description: 'Thumbnail URL (optional, small image top-right)' },
+          image: { type: 'string', description: 'Large image URL (optional, bottom of embed)' },
+        },
+        required: ['chat_id'],
+      },
+    },
+    {
       name: 'fetch_messages',
       description: 'Fetch recent messages from the Discord channel',
       inputSchema: {
@@ -204,6 +236,29 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         body: JSON.stringify({ content: chunks[0] }),
       })
       return { content: [{ type: 'text', text: 'edited' }] }
+    }
+
+    case 'reply_embed': {
+      const embed = {}
+      if (args.title) embed.title = args.title
+      if (args.description) embed.description = args.description
+      embed.color = args.color || 3447003
+      if (args.fields) embed.fields = args.fields.map((f) => ({ name: f.name, value: f.value, inline: f.inline || false }))
+      if (args.footer) embed.footer = { text: args.footer }
+      if (args.thumbnail) embed.thumbnail = { url: args.thumbnail }
+      if (args.image) embed.image = { url: args.image }
+
+      const body = { embeds: [embed] }
+      if (args.text) body.content = args.text
+      if (args.reply_to) body.message_reference = { message_id: args.reply_to }
+
+      const res = await discordFetch(`/channels/${args.chat_id}/messages`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) return { content: [{ type: 'text', text: 'embed send failed' }], isError: true }
+      const msg = await res.json()
+      return { content: [{ type: 'text', text: `sent embed (message_id: ${msg.id})` }] }
     }
 
     case 'react': {
