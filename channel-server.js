@@ -115,6 +115,9 @@ const mcp = new Server(
       `- If you need the user to choose between options, send the options via reply tool and wait for their Discord response.`,
       `- If you need clarification, ask via reply tool. Do NOT use interactive terminal prompts.`,
       `- The user cannot see terminal output. Everything must go through Discord.`,
+      ``,
+      // [디스코드 전면개편] 자동 안내 발송 비활성화 (대화 릴레이는 유지)
+      `- Do NOT proactively send a "ready"/"online"/startup greeting message (e.g. "봇이 준비되었습니다", "이제 말 걸어도 됩니다") when this session starts or reconnects. Only use reply/reply_embed/react in direct response to an actual <channel> notification triggered by a user's Discord message.`,
     ].join('\n'),
   },
 )
