@@ -29,9 +29,33 @@ const DISCORD_TIMEOUT = 10_000 // 10s
 // stderr only — stdout is MCP stdio transport
 const log = (...args) => process.stderr.write(`[${CHANNEL_NAME}] ${args.join(' ')}\n`)
 
+// ─── Liveness state (exposed on /health so the bot & doctor can see it) ─────
+
+let mcpAlive = false          // is the Claude Code session still on the other end?
+let lastInboundAt = null      // last user message forwarded into the session
+let lastReplyAt = null        // last reply that actually landed in Discord
+let lastSendError = null      // last Discord API failure, if any
+let inboundCount = 0
+let replyCount = 0
+
+// Threads/forum posts under this channel. Messages there are routed here by
+// bot.js, so replies addressed to a known thread id must be allowed through.
+const knownThreads = new Set()
+
 // ─── Discord REST helpers ───────────────────────────────────────────────────
 
 const DISCORD_API = 'https://discord.com/api/v10'
+
+// Human-readable cause for the failures that actually make a channel go silent.
+function explainDiscordError(status) {
+  switch (status) {
+    case 401: return '봇 토큰이 유효하지 않습니다 (DISCORD_BOT_TOKEN 확인)'
+    case 403: return '봇에게 이 채널의 메시지 보내기/보기 권한이 없습니다'
+    case 404: return '채널을 찾을 수 없습니다 (config.json의 channel id 확인)'
+    case 429: return 'Discord rate limit — 잠시 후 재시도하세요'
+    default: return `Discord API ${status}`
+  }
+}
 
 async function discordFetch(path, options = {}) {
   const res = await fetch(`${DISCORD_API}${path}`, {
@@ -45,14 +69,20 @@ async function discordFetch(path, options = {}) {
   })
   if (!res.ok) {
     const err = await res.text().catch(() => 'unknown')
+    res.errorText = err
+    lastSendError = { status: res.status, reason: explainDiscordError(res.status), at: Date.now() }
     log(`Discord API error: ${res.status} ${err}`)
+    log(`  -> ${lastSendError.reason}`)
   }
   return res
 }
 
+// Returns { ok, ids, status, reason } — callers MUST surface failures to the
+// model. Silently swallowing a 403 here is what makes the channel look dead:
+// Claude believes it answered while nothing ever reached Discord.
 async function discordSend(channelId, text, replyTo) {
   const chunks = splitMessage(text, 1950)
-  const results = []
+  const ids = []
 
   for (let i = 0; i < chunks.length; i++) {
     const body = { content: chunks[i] }
@@ -63,10 +93,13 @@ async function discordSend(channelId, text, replyTo) {
       method: 'POST',
       body: JSON.stringify(body),
     })
-    if (res.ok) results.push(await res.json())
+    if (!res.ok) {
+      return { ok: false, ids, status: res.status, reason: explainDiscordError(res.status) }
+    }
+    ids.push((await res.json()).id)
   }
 
-  return results
+  return { ok: true, ids }
 }
 
 function splitMessage(text, maxLen) {
@@ -117,7 +150,9 @@ const mcp = new Server(
       `- The user cannot see terminal output. Everything must go through Discord.`,
       ``,
       // [디스코드 전면개편] 자동 안내 발송 비활성화 (대화 릴레이는 유지)
-      `- Do NOT proactively send a "ready"/"online"/startup greeting message (e.g. "봇이 준비되었습니다", "이제 말 걸어도 됩니다") when this session starts or reconnects. Only use reply/reply_embed/react in direct response to an actual <channel> notification triggered by a user's Discord message.`,
+      `- Do NOT send a "ready"/"online"/startup greeting (e.g. "봇이 준비되었습니다", "이제 말 걸어도 됩니다") when this session starts or reconnects.`,
+      `- This is NOT a mute switch. You MUST still answer every <channel> notification: each user message gets a reply via the reply/reply_embed tool. Scheduled or alert pushes the user explicitly asked for remain allowed.`,
+      `- If a reply tool returns an error, the message never reached Discord. Do not assume it was delivered — report the failure and retry.`,
     ].join('\n'),
   },
 )
@@ -215,8 +250,9 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
 mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: args } = req.params
 
-  // Validate chat_id matches this channel (prevent cross-channel access)
-  if (args.chat_id && args.chat_id !== CHANNEL_ID) {
+  // Validate chat_id matches this channel or one of its threads
+  // (prevent cross-channel access)
+  if (args.chat_id && args.chat_id !== CHANNEL_ID && !knownThreads.has(args.chat_id)) {
     return { content: [{ type: 'text', text: `error: chat_id must be ${CHANNEL_ID}` }], isError: true }
   }
 
@@ -227,17 +263,31 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
 
   switch (name) {
     case 'reply': {
-      const results = await discordSend(args.chat_id, args.text, args.reply_to)
-      const ids = results.map((r) => r.id).join(', ')
-      return { content: [{ type: 'text', text: `sent (message_ids: ${ids})` }] }
+      const sent = await discordSend(args.chat_id, args.text, args.reply_to)
+      if (!sent.ok) {
+        return {
+          content: [{ type: 'text', text: `error: Discord 전송 실패 (${sent.status}) — ${sent.reason}` }],
+          isError: true,
+        }
+      }
+      lastReplyAt = Date.now()
+      replyCount++
+      return { content: [{ type: 'text', text: `sent (message_ids: ${sent.ids.join(', ')})` }] }
     }
 
     case 'edit_message': {
       const chunks = splitMessage(args.text, 1950)
-      await discordFetch(`/channels/${args.chat_id}/messages/${args.message_id}`, {
+      const res = await discordFetch(`/channels/${args.chat_id}/messages/${args.message_id}`, {
         method: 'PATCH',
         body: JSON.stringify({ content: chunks[0] }),
       })
+      if (!res.ok) {
+        return {
+          content: [{ type: 'text', text: `error: 수정 실패 (${res.status}) — ${explainDiscordError(res.status)}` }],
+          isError: true,
+        }
+      }
+      lastReplyAt = Date.now()
       return { content: [{ type: 'text', text: 'edited' }] }
     }
 
@@ -259,17 +309,30 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         method: 'POST',
         body: JSON.stringify(body),
       })
-      if (!res.ok) return { content: [{ type: 'text', text: 'embed send failed' }], isError: true }
+      if (!res.ok) {
+        return {
+          content: [{ type: 'text', text: `error: embed 전송 실패 (${res.status}) — ${explainDiscordError(res.status)}` }],
+          isError: true,
+        }
+      }
       const msg = await res.json()
+      lastReplyAt = Date.now()
+      replyCount++
       return { content: [{ type: 'text', text: `sent embed (message_id: ${msg.id})` }] }
     }
 
     case 'react': {
       const emoji = encodeURIComponent(args.emoji)
-      await discordFetch(
+      const res = await discordFetch(
         `/channels/${args.chat_id}/messages/${args.message_id}/reactions/${emoji}/@me`,
         { method: 'PUT' },
       )
+      if (!res.ok) {
+        return {
+          content: [{ type: 'text', text: `error: 리액션 실패 (${res.status}) — ${explainDiscordError(res.status)}` }],
+          isError: true,
+        }
+      }
       return { content: [{ type: 'text', text: 'reacted' }] }
     }
 
@@ -340,7 +403,25 @@ mcp.setNotificationHandler(PermissionRequestSchema, async ({ params }) => {
 
 // ─── Connect MCP ────────────────────────────────────────────────────────────
 
+mcp.onerror = (err) => log(`MCP error: ${err?.message || err}`)
+
+// When the Claude Code session exits, the stdio pipe closes. Without this the
+// process keeps its HTTP port open, keeps answering /health with "ok", and
+// every forwarded message vanishes into a dead transport — the channel looks
+// alive from Discord but never answers. Die instead, so bot.js sees it as down.
+function mcpGone(why) {
+  if (!mcpAlive) return
+  mcpAlive = false
+  log(`MCP transport closed (${why}) — Claude 세션이 종료된 것 같습니다. 서버를 내립니다.`)
+  setTimeout(() => process.exit(0), 500).unref?.()
+}
+
+mcp.onclose = () => mcpGone('transport closed')
+process.stdin.on('end', () => mcpGone('stdin EOF'))
+process.stdin.on('close', () => mcpGone('stdin closed'))
+
 await mcp.connect(new StdioServerTransport())
+mcpAlive = true
 log(`MCP connected (port: ${PORT}, channel: ${CHANNEL_ID})`)
 
 // ─── HTTP server ────────────────────────────────────────────────────────────
@@ -348,10 +429,22 @@ log(`MCP connected (port: ${PORT}, channel: ${CHANNEL_ID})`)
 const PERMISSION_REPLY_RE = /^\s*(y|yes|n|no)\s+([a-km-z]{5})\s*$/i
 
 const httpServer = createServer(async (req, res) => {
-  // Health check
+  // Health check — reports the MCP session state, not just "the port is open"
   if (req.method === 'GET' && req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ status: 'ok', channel: CHANNEL_NAME, port: PORT }))
+    res.writeHead(mcpAlive ? 200 : 503, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({
+      status: mcpAlive ? 'ok' : 'mcp-disconnected',
+      channel: CHANNEL_NAME,
+      channel_id: CHANNEL_ID,
+      port: PORT,
+      mcp: mcpAlive ? 'connected' : 'closed',
+      lastInboundAt,
+      lastReplyAt,
+      inboundCount,
+      replyCount,
+      lastSendError,
+      uptime: Math.round(process.uptime()),
+    }))
     return
   }
 
@@ -400,6 +493,18 @@ const httpServer = createServer(async (req, res) => {
       return
     }
 
+    // Message came from a thread/forum post under this channel
+    if (data.thread_id) knownThreads.add(data.thread_id)
+
+    // Refuse instead of pretending: a message accepted here after the Claude
+    // session died would be acknowledged in Discord and then never answered.
+    if (!mcpAlive) {
+      log('Message rejected: MCP session is not connected')
+      res.writeHead(503)
+      res.end('mcp disconnected')
+      return
+    }
+
     // Check for permission verdict
     const m = PERMISSION_REPLY_RE.exec(data.content)
     if (m) {
@@ -424,25 +529,37 @@ const httpServer = createServer(async (req, res) => {
       content = content ? `${content}\n${attachInfo}` : attachInfo
     }
 
-    // Forward as channel notification
+    // Forward as channel notification. Replies for a thread must go to the
+    // thread, not the parent channel, so hand the model the thread id.
+    const chatId = data.thread_id || data.channel_id
+    if (data.thread_id) {
+      content = `${content}\n[thread: ${data.thread_id} — reply with chat_id=${data.thread_id}]`
+    }
+
     await mcp.notification({
       method: 'notifications/claude/channel',
       params: {
         content,
         meta: {
-          chat_id: data.channel_id,
+          chat_id: chatId,
           message_id: data.message_id,
           user: data.user,
         },
       },
     })
 
+    lastInboundAt = Date.now()
+    inboundCount++
+
     res.writeHead(200)
     res.end('ok')
   } catch (err) {
     log(`HTTP error: ${err.message}`)
-    res.writeHead(500)
-    res.end('error')
+    // "Not connected" means the Claude session is gone — say so honestly.
+    const disconnected = /not connected/i.test(err.message || '')
+    if (disconnected) mcpGone('notification failed')
+    res.writeHead(disconnected ? 503 : 500)
+    res.end(disconnected ? 'mcp disconnected' : 'error')
   }
 })
 

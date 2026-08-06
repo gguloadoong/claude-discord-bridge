@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "setup": "node setup.js",
+    "doctor": "node doctor.js",
     "start": "bash start.sh",
     "stop": "tmux kill-session -t claude-discord-bridge 2>/dev/null || true"
   },

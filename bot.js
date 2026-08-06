@@ -35,6 +35,12 @@ if (!BOT_TOKEN) {
 const SHARED_SECRET = process.env.BRIDGE_SECRET || ''
 const DASHBOARD_PORT = parseInt(process.env.DASHBOARD_PORT || '8800')
 
+// If a delivered message gets no reply within this window, tell the user in
+// Discord instead of leaving them staring at a 👀 that never turns into an
+// answer. Set REPLY_TIMEOUT_MS=0 to disable.
+const REPLY_TIMEOUT_MS = parseInt(process.env.REPLY_TIMEOUT_MS ?? '120000')
+const NOTICE_COOLDOWN_MS = 5 * 60_000
+
 // ─── Dashboard state ────────────────────────────────────────────────────────
 
 const channelActivity = new Map()
@@ -104,6 +110,7 @@ async function postWithRetry(url, payload, retries = 2) {
 // ─── Health check ───────────────────────────────────────────────────────────
 
 const serverHealth = new Map()
+const serverDetail = new Map()
 
 async function checkHealth() {
   for (const [channelId, info] of channelMap) {
@@ -111,16 +118,24 @@ async function checkHealth() {
       const res = await fetch(`http://127.0.0.1:${info.port}/health`, {
         signal: AbortSignal.timeout(3_000),
       })
+      const detail = await res.json().catch(() => null)
+      serverDetail.set(channelId, detail)
+
       const wasDown = serverHealth.get(channelId) === false
       serverHealth.set(channelId, res.ok)
       if (res.ok && wasDown) {
         console.log(`[bot] ${info.name} (port ${info.port}) reconnected`)
+      }
+      // 503 = port open but the Claude session behind it is gone
+      if (!res.ok && !wasDown) {
+        console.warn(`[bot] ${info.name} (port ${info.port}) unhealthy: ${detail?.status || res.status}`)
       }
     } catch {
       if (serverHealth.get(channelId) !== false) {
         console.warn(`[bot] ${info.name} (port ${info.port}) is down`)
       }
       serverHealth.set(channelId, false)
+      serverDetail.set(channelId, null)
     }
   }
 }
@@ -149,12 +164,135 @@ client.on(Events.Error, (err) => {
   console.error('[bot] Discord client error:', err.message)
 })
 
+// ─── Routing (channel or one of its threads) ────────────────────────────────
+
+/**
+ * Resolve a message to its channel-server. Messages posted inside a thread or
+ * forum post carry the thread's id, which is not in config.json — routing them
+ * to the parent channel keeps threads from silently going nowhere.
+ */
+function resolveRoute(message) {
+  const direct = channelMap.get(message.channelId)
+  if (direct) return { target: direct, routeKey: message.channelId, threadId: null }
+
+  const parentId = message.channel?.isThread?.() ? message.channel.parentId : null
+  if (parentId) {
+    const parent = channelMap.get(parentId)
+    if (parent) return { target: parent, routeKey: parentId, threadId: message.channelId }
+  }
+  return null
+}
+
+// ─── User-facing notices (deduped, so we never spam a channel) ──────────────
+
+const lastNotice = new Map()
+
+async function notice(channel, key, text) {
+  const now = Date.now()
+  if (now - (lastNotice.get(key) || 0) < NOTICE_COOLDOWN_MS) return
+  lastNotice.set(key, now)
+  await channel.send(text).catch((err) => {
+    console.error(`[bot] notice send failed (${err.message}) — 채널 쓰기 권한을 확인하세요`)
+  })
+}
+
+// ─── No-reply watchdog ──────────────────────────────────────────────────────
+
+const pendingReply = new Map() // routeKey -> timer
+
+/**
+ * Warn the user when a delivered message never gets an answer.
+ *
+ * A healthy session that is simply busy (a long task) must not be nagged, so
+ * the first timeout re-checks the channel-server: only a dead MCP session gets
+ * an immediate alert. A live-but-silent session is given a much longer grace
+ * period before a softer nudge.
+ */
+function armReplyWatchdog(routeKey, message, target, stage = 1) {
+  if (!REPLY_TIMEOUT_MS || pendingReply.has(routeKey)) return
+
+  const wait = stage === 1 ? REPLY_TIMEOUT_MS : REPLY_TIMEOUT_MS * 3
+  const timer = setTimeout(async () => {
+    pendingReply.delete(routeKey)
+
+    let alive = false
+    try {
+      const res = await fetch(`http://127.0.0.1:${target.port}/health`, {
+        signal: AbortSignal.timeout(3_000),
+      })
+      alive = res.ok
+    } catch {
+      alive = false
+    }
+
+    if (!alive) {
+      recordError(routeKey)
+      await notice(
+        message.channel,
+        `noreply:${routeKey}`,
+        [
+          `⏳ 메시지는 전달됐는데 **#${target.name}** 세션이 응답하지 않습니다.`,
+          `Claude 세션이 종료됐거나 멈춘 것 같아요 (포트 ${target.port}).`,
+          '`npm run doctor`로 진단하거나 `npm start`로 다시 띄워주세요.',
+        ].join('\n'),
+      )
+      return
+    }
+
+    if (stage === 1) {
+      // Session is alive — probably still working. Give it more time.
+      console.warn(`[bot] #${target.name}: ${Math.round(wait / 1000)}초째 응답 없음 (세션은 살아있음)`)
+      armReplyWatchdog(routeKey, message, target, 2)
+      return
+    }
+
+    await notice(
+      message.channel,
+      `noreply:${routeKey}`,
+      [
+        `⏳ **#${target.name}** 세션은 살아있는데 아직 답이 없어요.`,
+        '긴 작업 중이거나 터미널에서 입력(권한 승인 등)을 기다리는 중일 수 있습니다.',
+      ].join('\n'),
+    )
+  }, wait)
+
+  timer.unref?.()
+  pendingReply.set(routeKey, timer)
+}
+
+function clearReplyWatchdog(routeKey) {
+  const timer = pendingReply.get(routeKey)
+  if (timer) {
+    clearTimeout(timer)
+    pendingReply.delete(routeKey)
+  }
+}
+
+// ─── Message handling ───────────────────────────────────────────────────────
+
+const loggedUnmapped = new Set()
+const loggedDenied = new Set()
+
 client.on(Events.MessageCreate, async (message) => {
-  const target = channelMap.get(message.channelId)
-  if (!target) return
+  const route = resolveRoute(message)
+  if (!route) {
+    // Unmapped channel: log once per channel so a wrong or stale id in
+    // config.json is visible instead of failing silently forever.
+    if (!message.author.bot && !loggedUnmapped.has(message.channelId)) {
+      loggedUnmapped.add(message.channelId)
+      console.warn(
+        `[bot] 매핑되지 않은 채널의 메시지 무시: #${message.channel?.name || '?'} ` +
+        `(${message.channelId}) — config.json에 등록되지 않았습니다`,
+      )
+    }
+    return
+  }
+
+  const { target, routeKey, threadId } = route
 
   // Track bot replies for dashboard conversation flow
   if (message.author.bot && message.author.id === client.user.id) {
+    clearReplyWatchdog(routeKey)
     recentMessages.unshift({
       channel: target.name,
       slug: target.slug,
@@ -171,21 +309,55 @@ client.on(Events.MessageCreate, async (message) => {
 
   // Check user allowlist (if configured)
   if (target.allowedUsers && !target.allowedUsers.includes(message.author.id)) {
+    const key = `${routeKey}:${message.author.id}`
+    if (!loggedDenied.has(key)) {
+      loggedDenied.add(key)
+      console.warn(
+        `[bot] #${target.name}: ${message.author.username}(${message.author.id})는 ` +
+        `allowed_users에 없어 무시됨`,
+      )
+    }
     return // silently ignore unauthorized users
   }
 
-  // Warn if server is known to be down
-  if (serverHealth.get(message.channelId) === false) {
+  // Empty body: either a sticker/embed-only message, or the MESSAGE CONTENT
+  // intent is off — in which case every message arrives blank and the channel
+  // looks mute.
+  if (!message.content && message.attachments.size === 0) {
+    console.warn(
+      `[bot] #${target.name}: 본문이 빈 메시지 — MESSAGE CONTENT INTENT가 꺼져 있을 수 있습니다 (npm run doctor)`,
+    )
+    await notice(
+      message.channel,
+      `empty:${routeKey}`,
+      '⚠️ 메시지 본문을 읽지 못했어요. 스티커 전용 메시지이거나, 봇의 **MESSAGE CONTENT INTENT**가 꺼져 있을 수 있습니다. (`npm run doctor`)',
+    )
+    return
+  }
+
+  // Server known to be down — say so instead of leaving the user hanging
+  if (serverHealth.get(routeKey) === false) {
+    const detail = serverDetail.get(routeKey)
     console.warn(`[bot] ${target.name} server is down, attempting delivery anyway...`)
+    await notice(
+      message.channel,
+      `down:${routeKey}`,
+      [
+        `🔴 **#${target.name}** 채널 세션이 응답하지 않습니다${detail?.status ? ` (${detail.status})` : ''}.`,
+        '터미널에서 세션이 살아있는지 확인하거나 `npm start`로 다시 실행해 주세요.',
+      ].join('\n'),
+    )
   }
 
   const payload = {
     content: message.content,
-    channel_id: message.channelId,
+    channel_id: routeKey,
     message_id: message.id,
     user: message.author.displayName || message.author.username,
     user_id: message.author.id,
   }
+
+  if (threadId) payload.thread_id = threadId
 
   if (message.attachments.size > 0) {
     payload.attachments = message.attachments.map((a) => ({
@@ -197,13 +369,22 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   try {
-    recordMessage(message.channelId, payload.user, payload.content)
+    recordMessage(routeKey, payload.user, payload.content)
     await postWithRetry(`http://127.0.0.1:${target.port}`, payload)
     await message.react('\u{1F440}') // 👀
+    armReplyWatchdog(routeKey, message, target)
   } catch (err) {
-    recordError(message.channelId)
+    recordError(routeKey)
     console.error(`[bot] ${target.name} delivery failed:`, err.message)
     await message.react('\u274C').catch(() => {}) // ❌
+    await notice(
+      message.channel,
+      `fail:${routeKey}`,
+      [
+        `**#${target.name}** 세션에 메시지를 전달하지 못했습니다 (포트 ${target.port}).`,
+        '`npm run doctor`로 원인을 확인해 주세요.',
+      ].join('\n'),
+    )
   }
 })
 
@@ -279,6 +460,7 @@ const dashboardServer = createServer(async (req, res) => {
         messagesToday: activity.messagesToday || 0,
         errors: activity.errors || 0,
         lastError: activity.lastError || null,
+        health: serverDetail.get(id) || null,
       })
     }
     res.writeHead(200, {

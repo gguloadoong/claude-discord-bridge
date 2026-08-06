@@ -168,6 +168,7 @@ Discord message
 | `DISCORD_BOT_TOKEN` | Yes | Your Discord bot token |
 | `BRIDGE_SECRET` | No | Shared secret for bot↔server authentication |
 | `CONFIG_PATH` | No | Custom path to config.json |
+| `REPLY_TIMEOUT_MS` | No | Warn in Discord if a delivered message gets no reply (default `120000`, `0` disables) |
 
 ### Security
 
@@ -225,6 +226,29 @@ Reply with the exact code to approve or deny.
 
 ## Troubleshooting
 
+### Diagnose first: `npm run doctor`
+
+```bash
+npm run doctor
+```
+
+Checks every point where a message can die, and prints what to fix:
+
+1. `config.json` missing or wrong channel ID → the bot silently ignores the channel
+2. **Message Content Intent** off → messages arrive with an empty body
+3. Missing channel permissions (View / Send / History / Reactions) → the bot can read but cannot answer
+4. `channel-server` not running → delivery fails (❌ reaction)
+5. Port open but the Claude session behind it is gone → the message is delivered and never answered
+
+### "The bot reacts 👀 but never replies"
+
+This is case 3 or 5 above.
+
+- **Case 3** — the bot lacks *Send Messages* in that channel. Claude answers, Discord rejects it with a 403, and nothing appears. `npm run doctor` reports it per channel; the reply tool now returns the error instead of reporting a fake success.
+- **Case 5** — the Claude Code session in that pane exited, but `channel-server.js` kept its port open. The channel server now shuts down when the session's stdio pipe closes, so `bot.js` marks the channel offline and posts a notice in Discord.
+
+If a delivered message gets no reply, the bot checks the channel server and warns in Discord. Tune or disable it with `REPLY_TIMEOUT_MS` (default `120000`, `0` disables).
+
 ### Bot doesn't react to messages
 - Check bot has **Message Content Intent** enabled in Discord Developer Portal
 - Verify bot is in the server and has permissions in the channel
@@ -250,6 +274,7 @@ claude-discord-bridge/
 ├── bot.js              # Discord gateway bot (message router)
 ├── channel-server.js   # MCP channel server (one per project)
 ├── setup.js            # Interactive setup wizard
+├── doctor.js           # Diagnoses "the bot doesn't answer" (npm run doctor)
 ├── start.sh            # tmux session launcher
 ├── config.json         # Channel → project mapping (generated)
 ├── config.example.json # Template for config.json
