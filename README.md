@@ -240,6 +240,29 @@ Checks every point where a message can die, and prints what to fix:
 4. `channel-server` not running → delivery fails (❌ reaction)
 5. Port open but the Claude session behind it is gone → the message is delivered and never answered
 
+### Recovering from Discord
+
+The bot answers these itself, so they keep working when the session behind a
+channel cannot reply — parked by a usage limit, or sitting on a terminal
+prompt nobody is watching:
+
+| Command | What it does |
+|---------|--------------|
+| `!ping` | Bot uptime and this channel's state |
+| `!상태` / `!status` | State of every channel |
+| `!재시작` / `!restart` | Restarts this channel's Claude session (`tmux respawn-pane`) |
+
+`!재시작` respawns the pane under `run-channel.sh`, so the fresh session is
+supervised exactly as `npm start` would have it. Only `allowed_users` may run
+these when an allowlist is configured.
+
+### "The session restarted and went quiet"
+
+A fresh Claude Code session can stop on an interactive prompt — first-run theme
+setup, *do you trust the files in this folder*, a re-login. The MCP server never
+comes up, so the channel looks identical to every other failure. `monitor.js`
+detects those prompts and the bot reports them to Discord with the prompt text.
+
 ### "Every channel went silent at once"
 
 Usage limits are account-wide, so a single limit parks **all** channel sessions

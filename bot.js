@@ -12,6 +12,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+const execFileAsync = promisify(execFile)
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 
@@ -72,13 +73,18 @@ function recordError(channelId) {
   channelActivity.set(channelId, entry)
 }
 
-// Build channel ID → config mapping
+// Build channel ID → config mapping.
+// paneIndex mirrors start.sh: panes are created in config order, so index N
+// is the tmux pane running channel N. Needed to restart a wedged session.
 const channelMap = new Map()
+let paneCounter = 0
 for (const [channelId, info] of Object.entries(config.channels)) {
   channelMap.set(channelId, {
     port: info.port,
     name: info.name,
     slug: info.slug,
+    cwd: info.cwd,
+    paneIndex: paneCounter++,
     allowedUsers: info.allowed_users || null, // null = allow all
   })
 }
@@ -149,6 +155,7 @@ async function checkHealth() {
 // that and we relay it to Discord, because the user is watching Discord only.
 
 const limitState = new Map() // channelId -> { active, raw, resetsAt, autoResume }
+const inputState = new Map()  // channelId -> waiting on a terminal prompt
 
 async function channelOf(id) {
   return client.channels.cache.get(id) || (await client.channels.fetch(id).catch(() => null))
@@ -172,6 +179,23 @@ async function checkLimits() {
 
     const was = limitState.get(channelId)?.active === true
     limitState.set(channelId, limit)
+
+    // A pane sitting on an interactive prompt is just as silent as a dead
+    // one, and the user never sees the terminal.
+    const needsInput = data[info.slug]?.needsInput
+    const waited = inputState.get(channelId) === true
+    inputState.set(channelId, needsInput?.active === true)
+    if (needsInput?.active && !waited) {
+      console.warn(`[bot] #${info.name}: 터미널 입력 대기 — ${needsInput.raw}`)
+      const channel = await channelOf(channelId)
+      if (channel) {
+        await notice(channel, `input:${channelId}`, [
+          `🖐 **#${info.name}** 세션이 터미널 입력을 기다리고 있습니다.`,
+          `> ${needsInput.raw}`,
+          '터미널에서 직접 응답하거나 `!재시작`으로 세션을 다시 띄워주세요.',
+        ].join('\n'))
+      }
+    }
 
     if (limit.active && !was) {
       console.warn(`[bot] #${info.name}: 사용 한도 초과 감지 — ${limit.raw}`)
@@ -201,6 +225,95 @@ function limitMessage(info, limit) {
         : '한도가 풀릴 때까지 응답할 수 없습니다.',
     '한도는 계정 단위라 모든 채널이 함께 멈춥니다. 지금 보낸 메시지는 누락될 수 있으니 재개 후 다시 보내주세요.',
   ].join('\n')
+}
+
+// ─── Control commands ───────────────────────────────────────────────────────
+//
+// Answered by the bot itself, never by the Claude session. That is the whole
+// point: when a session is wedged (parked by a usage limit, or left idle after
+// its turn was cancelled) the user only sees silence, and the terminal is not
+// something they watch. These commands still work in that state.
+
+const CONTROL_RE = /^\s*[!/](ping|상태|status|재시작|restart|help|도움말)\s*$/i
+
+const TMUX_SESSION = process.env.TMUX_SESSION || 'claude-discord-bridge'
+const RUNNER = join(__dirname, 'run-channel.sh')
+
+const shq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`
+
+async function restartSession(target) {
+  const pane = `${TMUX_SESSION}:dashboard.${target.paneIndex}`
+  const cmd = `bash ${shq(RUNNER)} ${shq(target.cwd)} ${shq(target.name)}`
+  // -k kills the pane's current process; run-channel.sh then supervises the
+  // fresh session exactly as start.sh does.
+  await execFileAsync('tmux', ['respawn-pane', '-k', '-t', pane, cmd])
+}
+
+function healthLine(channelId, target) {
+  const up = serverHealth.get(channelId)
+  const detail = serverDetail.get(channelId)
+  const limit = limitState.get(channelId)
+
+  if (limit?.active) {
+    return `⏸ 한도 초과${limit.resetsAt ? ` — ${limit.resetsAt} 재설정` : ''}`
+  }
+  if (inputState.get(channelId)) return '🖐 터미널 입력 대기 중'
+  if (up === false) return `🔴 채널 서버 응답 없음 (포트 ${target.port})`
+  if (detail?.mcp === 'closed') return '🔴 Claude 세션 끊김'
+
+  const seen = detail?.lastInboundAt
+  const replied = detail?.lastReplyAt
+  if (seen && (!replied || replied < seen)) {
+    return `🟡 메시지는 받았지만 아직 응답 없음 (수신 ${detail.inboundCount}건 / 응답 ${detail.replyCount}건)`
+  }
+  return `🟢 정상 (수신 ${detail?.inboundCount ?? 0}건 / 응답 ${detail?.replyCount ?? 0}건)`
+}
+
+async function handleControl(cmd, message, target, routeKey) {
+  const c = cmd.toLowerCase()
+
+  if (c === 'ping') {
+    await message.reply(
+      `🏓 봇 정상 (uptime ${Math.round(process.uptime() / 60)}분)\n` +
+      `**#${target.name}**: ${healthLine(routeKey, target)}`,
+    ).catch(() => {})
+    return
+  }
+
+  if (c === 'status' || c === '상태') {
+    const lines = [`**📋 브리지 상태** (uptime ${Math.round(process.uptime() / 60)}분)`, '']
+    for (const [id, info] of channelMap) {
+      lines.push(`${id === routeKey ? '▸' : ' '} **#${info.name}** — ${healthLine(id, info)}`)
+    }
+    await message.reply(lines.join('\n')).catch(() => {})
+    return
+  }
+
+  if (c === 'restart' || c === '재시작') {
+    await message.reply(`♻️ **#${target.name}** 세션을 재시작합니다...`).catch(() => {})
+    try {
+      await restartSession(target)
+      clearReplyWatchdog(routeKey)
+      limitState.set(routeKey, { active: false })
+      await message.channel.send(
+        `✅ 재시작 완료. 10초쯤 뒤에 다시 말 걸어주세요.`,
+      ).catch(() => {})
+      console.log(`[bot] #${target.name}: ${message.author.username} 요청으로 세션 재시작`)
+    } catch (err) {
+      console.error(`[bot] 재시작 실패: ${err.message}`)
+      await message.channel.send(
+        `❌ 재시작 실패: ${err.message}\ntmux 세션(\`${TMUX_SESSION}\`)이 실행 중인지 확인해주세요.`,
+      ).catch(() => {})
+    }
+    return
+  }
+
+  await message.reply([
+    '**사용 가능한 명령** (세션이 멈춰도 봇이 직접 답합니다)',
+    '`!ping` — 봇과 이 채널 상태',
+    '`!상태` — 전체 채널 상태',
+    '`!재시작` — 이 채널의 Claude 세션 재시작',
+  ].join('\n')).catch(() => {})
 }
 
 // ─── Discord client ─────────────────────────────────────────────────────────
@@ -393,6 +506,14 @@ client.on(Events.MessageCreate, async (message) => {
       )
     }
     return // silently ignore unauthorized users
+  }
+
+  // Control commands are handled here, by the bot — they must keep working
+  // when the session behind the channel cannot answer.
+  const cmd = message.content.match(CONTROL_RE)?.[1]
+  if (cmd) {
+    await handleControl(cmd, message, target, routeKey)
+    return
   }
 
   // Empty body: either a sticker/embed-only message, or the MESSAGE CONTENT

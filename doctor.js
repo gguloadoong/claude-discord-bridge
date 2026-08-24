@@ -320,6 +320,11 @@ try {
       bad(`#${info.name}: 터미널 창을 읽을 수 없습니다 (세션이 없거나 종료됨)`)
       continue
     }
+    if (pane.needsInput?.active) {
+      bad(`#${info.name}: 터미널 입력 대기 중 — ${pane.needsInput.raw}`)
+      hint('tmux attach -t claude-discord-bridge 로 직접 응답하거나, 디스코드에서 !재시작')
+      continue
+    }
     if (pane.limit?.active) {
       limited.push(info.name)
       bad(`#${info.name}: 사용 한도 초과 — ${pane.limit.raw}`)

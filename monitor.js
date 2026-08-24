@@ -122,11 +122,30 @@ function parseLimit(lines) {
   return tight || spaced || NONE
 }
 
+// ─── Terminal input prompts ─────────────────────────────────────────────────
+//
+// A restarted session can land on an interactive prompt — first-run theme
+// setup, "do you trust the files in this folder", a re-login. The MCP server
+// never comes up, the pane waits forever, and the user (who only watches
+// Discord) sees exactly the same silence as any other failure. Surface it.
+
+const INPUT_RE = /(do you trust the files|choose the text style|select login method|log in with your|press enter to continue)[^]{0,60}/i
+
+function parsePrompt(lines) {
+  const trimmed = lines.slice(-15).map((l) => l.replace(/\s+$/, ''))
+  const spaced = trimmed.join(' ').replace(/\s+/g, ' ')
+  const tight = trimmed.join('').replace(/\s+/g, ' ')
+  const hit = spaced.match(INPUT_RE)?.[0] || tight.match(INPUT_RE)?.[0]
+  if (!hit) return { active: false, raw: null }
+  return { active: true, raw: hit.trim().slice(0, 120) }
+}
+
 function parsePane(raw) {
   if (!raw) {
     return {
       state: 'offline', agent: null, tool: null, context: null, session: null,
       limit: { active: false, raw: null, resetsAt: null, autoResume: false },
+      needsInput: { active: false, raw: null },
     }
   }
 
@@ -183,6 +202,9 @@ function parsePane(raw) {
 
   result.limit = parseLimit(lines)
   if (result.limit.active) result.state = 'limited'
+
+  result.needsInput = parsePrompt(lines)
+  if (result.needsInput.active) result.state = 'waiting-input'
 
   return result
 }
