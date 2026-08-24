@@ -158,14 +158,19 @@ ok('DISCORD_BOT_TOKEN 설정됨')
 section('2. 봇 계정 / 인텐트')
 
 const me = await api('/users/@me')
+// Discord being unreachable must not hide the local diagnosis below — a
+// parked session or a dead port is exactly what we came here to find.
+let skipDiscord = false
 if (!me.ok) {
-  bad(`봇 토큰이 유효하지 않습니다 (HTTP ${me.status})`)
-  hint('Discord 개발자 포털에서 토큰을 다시 발급받아 .env에 넣으세요')
-  process.exit(1)
+  bad(`Discord API 확인 실패 (HTTP ${me.status}) — 토큰이 잘못됐거나 네트워크가 막혔습니다`)
+  hint('개발자 포털에서 토큰을 다시 발급받아 .env에 넣으세요')
+  hint('아래 로컬 점검은 계속 진행합니다')
+  skipDiscord = true
+} else {
+  ok(`봇: ${me.body.username} (${me.body.id})`)
 }
-ok(`봇: ${me.body.username} (${me.body.id})`)
 
-const app = await api('/applications/@me')
+const app = skipDiscord ? { ok: false } : await api('/applications/@me')
 if (app.ok) {
   const flags = BigInt(app.body.flags || 0)
   const MESSAGE_CONTENT = 1n << 18n
@@ -177,7 +182,7 @@ if (app.ok) {
     hint('개발자 포털 > Bot > Privileged Gateway Intents > MESSAGE CONTENT INTENT 켜기')
     hint('켠 뒤 npm start 로 봇을 재시작해야 적용됩니다')
   }
-} else {
+} else if (!skipDiscord) {
   warn(`application 정보를 못 읽었습니다 (HTTP ${app.status}) — 인텐트 확인 생략`)
 }
 
@@ -187,7 +192,12 @@ section('3. 채널별 점검')
 for (const [channelId, info] of Object.entries(config.channels)) {
   console.log(`\n  \u{1F4C2} #${info.name} (${channelId}) — 포트 ${info.port}`)
 
-  const ch = await api(`/channels/${channelId}`)
+  const ch = skipDiscord ? { ok: false, status: 0 } : await api(`/channels/${channelId}`)
+  if (skipDiscord) {
+    warn('Discord 확인 생략 — 로컬 채널 서버만 점검합니다')
+    await checkLocalServer(info)
+    continue
+  }
   if (!ch.ok) {
     bad(`채널에 접근할 수 없습니다 (HTTP ${ch.status})`)
     hint(ch.status === 404
@@ -240,7 +250,10 @@ for (const [channelId, info] of Object.entries(config.channels)) {
     hint(`허용된 ID: ${info.allowed_users.join(', ')}`)
   }
 
-  // Local channel-server
+  await checkLocalServer(info)
+}
+
+async function checkLocalServer(info) {
   try {
     const res = await fetch(`http://127.0.0.1:${info.port}/health`, {
       signal: AbortSignal.timeout(3_000),
@@ -287,6 +300,42 @@ try {
 } catch {
   bad('bot.js가 실행 중이 아닙니다 (대시보드 포트 응답 없음)')
   hint('npm start 로 실행하세요')
+}
+
+// 5. Usage limit / session state
+section('5. 사용 한도 / 세션 상태')
+
+try {
+  const res = await fetch(`http://127.0.0.1:${process.env.MONITOR_PORT || 8899}/api/monitor`, {
+    signal: AbortSignal.timeout(3_000),
+  })
+  const mon = await res.json()
+
+  const limited = []
+  for (const [, info] of Object.entries(config.channels)) {
+    const pane = mon[info.slug]
+    if (!pane) continue
+
+    if (pane.state === 'offline') {
+      bad(`#${info.name}: 터미널 창을 읽을 수 없습니다 (세션이 없거나 종료됨)`)
+      continue
+    }
+    if (pane.limit?.active) {
+      limited.push(info.name)
+      bad(`#${info.name}: 사용 한도 초과 — ${pane.limit.raw}`)
+      if (pane.limit.resetsAt) hint(`재설정: ${pane.limit.resetsAt}`)
+      if (pane.limit.autoResume) hint('한도가 풀리면 세션이 자동으로 재개됩니다')
+    } else {
+      ok(`#${info.name}: ${pane.state}${pane.context ? ` (ctx ${pane.context}%)` : ''}`)
+    }
+  }
+
+  if (limited.length > 1) {
+    hint('한도는 계정 단위입니다 — 모든 채널이 동시에 멈춘 것은 정상적인 증상입니다')
+  }
+} catch {
+  warn('monitor.js가 실행 중이 아닙니다 — 한도/세션 상태를 확인할 수 없습니다')
+  hint('npm start 로 실행하거나, tmux attach -t claude-discord-bridge 로 직접 확인하세요')
 }
 
 // ─── Summary ────────────────────────────────────────────────────────────────

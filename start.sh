@@ -76,8 +76,11 @@ IFS='|' read -r slug port channel_id name cwd <<< "${CHANNELS[0]}"
 echo "  #$name -> $cwd (port: $port)"
 
 ESCAPED_CWD=$(printf '%q' "$cwd")
+RUNNER="$BRIDGE_DIR/run-channel.sh"
+chmod +x "$RUNNER" 2>/dev/null || true
+
 tmux new-session -d -s "$SESSION" -n dashboard \
-  "export DISCORD_BOT_TOKEN=$(printf '%q' "$DISCORD_BOT_TOKEN"); [ -n \"$BRIDGE_SECRET\" ] && export BRIDGE_SECRET=$(printf '%q' "$BRIDGE_SECRET"); cd $ESCAPED_CWD && claude --dangerously-load-development-channels server:discord-bridge; echo '[exited]'; read"
+  "export DISCORD_BOT_TOKEN=$(printf '%q' "$DISCORD_BOT_TOKEN"); [ -n \"$BRIDGE_SECRET\" ] && export BRIDGE_SECRET=$(printf '%q' "$BRIDGE_SECRET"); bash $(printf '%q' "$RUNNER") $ESCAPED_CWD $(printf '%q' "$name")"
 
 # Set env for subsequent panes
 tmux set-environment -t "$SESSION" DISCORD_BOT_TOKEN "$DISCORD_BOT_TOKEN"
@@ -93,14 +96,14 @@ for ((i = 1; i < NUM_CHANNELS; i++)); do
   echo "  #$name -> $cwd (port: $port)"
 
   tmux split-window -t "$SESSION:dashboard" \
-    "cd $(printf '%q' "$cwd") && claude --dangerously-load-development-channels server:discord-bridge; echo '[exited]'; read"
+    "bash $(printf '%q' "$RUNNER") $(printf '%q' "$cwd") $(printf '%q' "$name")"
 
   sleep 1
 done
 
 # Bot + Monitor pane (monitor runs in background, bot in foreground)
 tmux split-window -t "$SESSION:dashboard" \
-  "cd $(printf '%q' "$BRIDGE_DIR") && node monitor.js & node bot.js; echo '[bot exited]'; read"
+  "cd $(printf '%q' "$BRIDGE_DIR") && while true; do node monitor.js & mon=\$!; node bot.js; kill \$mon 2>/dev/null; echo '[bot exited] 5초 후 재시작 (Ctrl+C로 중단)'; sleep 5; done"
 
 sleep 1
 

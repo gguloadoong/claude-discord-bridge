@@ -76,8 +76,59 @@ function capturePaneRaw(paneIndex) {
   } catch { return null }
 }
 
+// ─── Usage limit detection ──────────────────────────────────────────────────
+//
+// Claude Code parks the session when the account hits its usage limit and
+// resumes on its own ("continuing automatically when it resets"). The process
+// stays alive and the MCP port stays open, so every health check says "ok"
+// while Discord messages get queued into a session that cannot answer.
+// The banner in the pane is the only visible signal — read it.
+
+// Only the blocking banner counts. "Context limit", "Fast limit" and
+// "usage credit limit" are different states that do not stop replies.
+const LIMIT_RE = /(?:usage limit reached|reached your usage limit)[^]{0,90}/i
+const RESET_RE = /(?:continuing automatically at|resets? at|resets? in)\s+([^·∙|]+)/i
+
+const NONE = { active: false, raw: null, resetsAt: null, autoResume: false }
+
+function scanBanner(haystack) {
+  const banner = haystack.match(LIMIT_RE)?.[0]
+  if (!banner) return null
+  return {
+    active: true,
+    raw: banner.trim().slice(0, 160),
+    resetsAt: banner.match(RESET_RE)?.[1]?.trim() || null,
+    autoResume: /continuing automatically|continuing shortly/i.test(banner),
+  }
+}
+
+function parseLimit(lines) {
+  // Only the live tail — an old banner further up the scrollback is history,
+  // not current state.
+  const trimmed = lines.slice(-12).map((l) => l.replace(/\s+$/, ''))
+
+  // Panes in the tiled war-room layout are ~50 columns, so the banner is hard
+  // wrapped across rows and tmux eats the space at the wrap point. Neither
+  // join survives that alone: joining with a space repairs a wrap that fell on
+  // a word boundary, joining tight repairs one that fell mid-word. Try both
+  // and keep whichever recovered the reset time.
+  const spaced = scanBanner(trimmed.join(' ').replace(/\s+/g, ' '))
+  const tight = scanBanner(trimmed.join('').replace(/\s+/g, ' '))
+
+  if (spaced?.resetsAt) return spaced
+  if (tight?.resetsAt) return tight
+  // Neither recovered a time: the tight join reads better, since a wrap that
+  // split a word ("w hen") only looks right when rejoined without the space.
+  return tight || spaced || NONE
+}
+
 function parsePane(raw) {
-  if (!raw) return { state: 'offline', agent: null, tool: null, context: null, session: null }
+  if (!raw) {
+    return {
+      state: 'offline', agent: null, tool: null, context: null, session: null,
+      limit: { active: false, raw: null, resetsAt: null, autoResume: false },
+    }
+  }
 
   const lines = raw.split('\n').filter(Boolean)
   const result = {
@@ -129,6 +180,9 @@ function parsePane(raw) {
       if (p.key === 'running') result.state = 'working'
     }
   }
+
+  result.limit = parseLimit(lines)
+  if (result.limit.active) result.state = 'limited'
 
   return result
 }

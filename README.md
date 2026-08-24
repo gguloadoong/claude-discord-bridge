@@ -240,6 +240,23 @@ Checks every point where a message can die, and prints what to fix:
 4. `channel-server` not running → delivery fails (❌ reaction)
 5. Port open but the Claude session behind it is gone → the message is delivered and never answered
 
+### "Every channel went silent at once"
+
+Usage limits are account-wide, so a single limit parks **all** channel sessions
+at the same time. Claude Code does not exit — it prints
+`Usage limit reached · continuing automatically when it resets` and waits. The
+process stays up, the MCP port stays open, and `/health` keeps reporting `ok`,
+so nothing downstream notices; messages are delivered into a session that
+cannot answer.
+
+`monitor.js` now reads that banner from the pane and `bot.js` relays it to
+Discord — the limit, the reset time, and a follow-up when it clears. Messages
+sent during the window are **not** replayed automatically (re-running a queued
+command in a trading channel is not safe); resend them after the recovery
+notice.
+
+`npm run doctor` reports the limit state per channel under *5. 사용 한도 / 세션 상태*.
+
 ### "The bot reacts 👀 but never replies"
 
 This is case 3 or 5 above.
@@ -275,6 +292,7 @@ claude-discord-bridge/
 ├── channel-server.js   # MCP channel server (one per project)
 ├── setup.js            # Interactive setup wizard
 ├── doctor.js           # Diagnoses "the bot doesn't answer" (npm run doctor)
+├── run-channel.sh      # Supervises one channel session (restarts if it exits)
 ├── start.sh            # tmux session launcher
 ├── config.json         # Channel → project mapping (generated)
 ├── config.example.json # Template for config.json

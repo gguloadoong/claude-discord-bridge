@@ -40,6 +40,7 @@ const DASHBOARD_PORT = parseInt(process.env.DASHBOARD_PORT || '8800')
 // answer. Set REPLY_TIMEOUT_MS=0 to disable.
 const REPLY_TIMEOUT_MS = parseInt(process.env.REPLY_TIMEOUT_MS ?? '120000')
 const NOTICE_COOLDOWN_MS = 5 * 60_000
+const MONITOR_PORT = parseInt(process.env.MONITOR_PORT || '8899')
 
 // ─── Dashboard state ────────────────────────────────────────────────────────
 
@@ -140,6 +141,68 @@ async function checkHealth() {
   }
 }
 
+// ─── Usage limit tracking ───────────────────────────────────────────────────
+//
+// A usage limit is account-wide, so it parks every channel session at once
+// while each one still looks healthy: the process is alive, the MCP port is
+// open, /health says ok. Only the terminal banner shows it — monitor.js reads
+// that and we relay it to Discord, because the user is watching Discord only.
+
+const limitState = new Map() // channelId -> { active, raw, resetsAt, autoResume }
+
+async function channelOf(id) {
+  return client.channels.cache.get(id) || (await client.channels.fetch(id).catch(() => null))
+}
+
+async function checkLimits() {
+  let data
+  try {
+    const res = await fetch(`http://127.0.0.1:${MONITOR_PORT}/api/monitor`, {
+      signal: AbortSignal.timeout(3_000),
+    })
+    if (!res.ok) return
+    data = await res.json()
+  } catch {
+    return // monitor.js not running — limit reporting is best-effort
+  }
+
+  for (const [channelId, info] of channelMap) {
+    const limit = data[info.slug]?.limit
+    if (!limit) continue
+
+    const was = limitState.get(channelId)?.active === true
+    limitState.set(channelId, limit)
+
+    if (limit.active && !was) {
+      console.warn(`[bot] #${info.name}: 사용 한도 초과 감지 — ${limit.raw}`)
+      const channel = await channelOf(channelId)
+      if (channel) await notice(channel, `limit:${channelId}`, limitMessage(info, limit))
+    } else if (!limit.active && was) {
+      console.log(`[bot] #${info.name}: 한도 해제됨`)
+      const channel = await channelOf(channelId)
+      if (channel) {
+        await notice(
+          channel,
+          `recovered:${channelId}`,
+          `✅ **#${info.name}** 사용 한도가 풀렸습니다. 다시 말 걸어주세요.`,
+        )
+      }
+    }
+  }
+}
+
+function limitMessage(info, limit) {
+  return [
+    `⏸ **#${info.name}** — Claude 사용 한도 초과로 세션이 멈춰 있습니다.`,
+    limit.resetsAt
+      ? `한도 재설정: **${limit.resetsAt}**${limit.autoResume ? ' (자동 재개)' : ''}`
+      : limit.autoResume
+        ? '한도가 풀리면 자동으로 재개됩니다.'
+        : '한도가 풀릴 때까지 응답할 수 없습니다.',
+    '한도는 계정 단위라 모든 채널이 함께 멈춥니다. 지금 보낸 메시지는 누락될 수 있으니 재개 후 다시 보내주세요.',
+  ].join('\n')
+}
+
 // ─── Discord client ─────────────────────────────────────────────────────────
 
 const client = new Client({
@@ -158,6 +221,8 @@ client.once(Events.ClientReady, (c) => {
   // Health check every 30s
   checkHealth()
   setInterval(checkHealth, 30_000)
+  checkLimits()
+  setInterval(checkLimits, 30_000)
 })
 
 client.on(Events.Error, (err) => {
@@ -223,6 +288,14 @@ function armReplyWatchdog(routeKey, message, target, stage = 1) {
       alive = res.ok
     } catch {
       alive = false
+    }
+
+    // A usage limit explains the silence better than anything else — check it
+    // before blaming the session.
+    const limit = limitState.get(routeKey)
+    if (limit?.active) {
+      await notice(message.channel, `limit:${routeKey}`, limitMessage(target, limit))
+      return
     }
 
     if (!alive) {
@@ -293,6 +366,8 @@ client.on(Events.MessageCreate, async (message) => {
   // Track bot replies for dashboard conversation flow
   if (message.author.bot && message.author.id === client.user.id) {
     clearReplyWatchdog(routeKey)
+    // A real reply proves the session is working — it is not limited.
+    if (limitState.get(routeKey)?.active) limitState.set(routeKey, { active: false })
     recentMessages.unshift({
       channel: target.name,
       slug: target.slug,
@@ -333,6 +408,12 @@ client.on(Events.MessageCreate, async (message) => {
       '⚠️ 메시지 본문을 읽지 못했어요. 스티커 전용 메시지이거나, 봇의 **MESSAGE CONTENT INTENT**가 꺼져 있을 수 있습니다. (`npm run doctor`)',
     )
     return
+  }
+
+  // Usage limit — tell the user up front rather than after a silent timeout
+  const limit = limitState.get(routeKey)
+  if (limit?.active) {
+    await notice(message.channel, `limit:${routeKey}`, limitMessage(target, limit))
   }
 
   // Server known to be down — say so instead of leaving the user hanging
