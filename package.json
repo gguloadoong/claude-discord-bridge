@@ -7,7 +7,8 @@
     "setup": "node setup.js",
     "doctor": "node doctor.js",
     "start": "bash start.sh",
-    "stop": "tmux kill-session -t claude-discord-bridge 2>/dev/null || true"
+    "stop": "tmux kill-session -t claude-discord-bridge 2>/dev/null || true",
+    "smoke": "bash smoke.sh"
   },
   "keywords": [
     "claude-code",

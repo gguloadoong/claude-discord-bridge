@@ -15,6 +15,9 @@ import {
   CallToolRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 import { createServer } from 'node:http'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 
 const PORT = parseInt(process.argv[2] || '8801')
@@ -22,6 +25,17 @@ const CHANNEL_ID = process.argv[3] || ''
 const CHANNEL_NAME = process.argv[4] || 'discord'
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || ''
 const SHARED_SECRET = process.env.BRIDGE_SECRET || ''
+
+// Per-channel permission to speak first. Default off: a channel answers, it
+// does not announce. Only a channel with "allow_proactive": true in
+// config.json may push alerts on its own.
+let ALLOW_PROACTIVE = false
+try {
+  const cfgPath = process.env.CONFIG_PATH ||
+    join(dirname(fileURLToPath(import.meta.url)), 'config.json')
+  ALLOW_PROACTIVE =
+    JSON.parse(readFileSync(cfgPath, 'utf-8')).channels?.[CHANNEL_ID]?.allow_proactive === true
+} catch {}
 
 const MAX_BODY_SIZE = 64 * 1024 // 64KB
 const DISCORD_TIMEOUT = 10_000 // 10s
@@ -149,9 +163,20 @@ const mcp = new Server(
       `- If you need clarification, ask via reply tool. Do NOT use interactive terminal prompts.`,
       `- The user cannot see terminal output. Everything must go through Discord.`,
       ``,
-      // [디스코드 전면개편] 자동 안내 발송 비활성화 (대화 릴레이는 유지)
-      `- Do NOT send a "ready"/"online"/startup greeting (e.g. "봇이 준비되었습니다", "이제 말 걸어도 됩니다") when this session starts or reconnects.`,
-      `- This is NOT a mute switch. You MUST still answer every <channel> notification: each user message gets a reply via the reply/reply_embed tool. Scheduled or alert pushes the user explicitly asked for remain allowed.`,
+      // 자동 발송 비활성화 (대화 릴레이는 유지).
+      // 기본값은 "말 걸 때만 말한다". 알림을 먼저 보내야 하는 채널만
+      // config.json에 allow_proactive: true 를 넣어 예외로 허용한다.
+      ...(ALLOW_PROACTIVE
+        ? [
+            `- Do NOT send a "ready"/"online"/startup greeting (e.g. "봇이 준비되었습니다") when this session starts or reconnects.`,
+            `- This channel is opted in to alert pushes (allow_proactive), so scheduled alerts the user explicitly asked for are allowed. Nothing else: no status updates, no handover or session-summary notices.`,
+          ]
+        : [
+            `- NEVER send an unprompted message to this channel, for any reason.`,
+            `- Only use reply/reply_embed/react in DIRECT RESPONSE to an actual <channel> notification triggered by a user's Discord message. If no user message triggered you, send nothing.`,
+            `- This ban explicitly covers: startup/reconnect greetings ("봇이 준비되었습니다", "이제 말 걸어도 됩니다"), status or progress updates, and handover / session-takeover / context-summary notices ("인수인계", "세션을 이어받았습니다", "이전 대화를 요약하면"). Starting or resuming a session is NOT a reason to post.`,
+          ]),
+      `- Answering is still mandatory: every <channel> notification from a user gets a reply via the reply/reply_embed tool.`,
       `- If a reply tool returns an error, the message never reached Discord. Do not assume it was delivered — report the failure and retry.`,
     ].join('\n'),
   },

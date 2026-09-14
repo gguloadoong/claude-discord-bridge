@@ -5,13 +5,17 @@
       "slug": "myproject",
       "port": 8801,
       "cwd": "/path/to/your/project",
-      "allowed_users": ["YOUR_DISCORD_USER_ID"]
+      "allowed_users": [
+        "YOUR_DISCORD_USER_ID"
+      ],
+      "allow_proactive": false
     },
     "9876543210987654321": {
       "name": "another-project",
       "slug": "another",
       "port": 8802,
-      "cwd": "/path/to/another/project"
+      "cwd": "/path/to/another/project",
+      "allow_proactive": true
     }
   }
 }

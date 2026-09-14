@@ -10,6 +10,8 @@ import { Client, GatewayIntentBits, Events } from 'discord.js'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const execFileAsync = promisify(execFile)
@@ -42,6 +44,11 @@ const DASHBOARD_PORT = parseInt(process.env.DASHBOARD_PORT || '8800')
 const REPLY_TIMEOUT_MS = parseInt(process.env.REPLY_TIMEOUT_MS ?? '120000')
 const NOTICE_COOLDOWN_MS = 5 * 60_000
 const MONITOR_PORT = parseInt(process.env.MONITOR_PORT || '8899')
+
+// The bot posts its own diagnostic notices (limit hit, session down, waiting
+// on a terminal prompt). Those are unprompted messages too — set
+// BOT_NOTICES=0 to keep them in the log only.
+const NOTICES_ENABLED = process.env.BOT_NOTICES !== '0'
 
 // ─── Dashboard state ────────────────────────────────────────────────────────
 
@@ -366,6 +373,10 @@ function resolveRoute(message) {
 const lastNotice = new Map()
 
 async function notice(channel, key, text) {
+  if (!NOTICES_ENABLED) {
+    console.log(`[bot] notice suppressed (BOT_NOTICES=0) [${key}]: ${text.split('\n')[0]}`)
+    return
+  }
   const now = Date.now()
   if (now - (lastNotice.get(key) || 0) < NOTICE_COOLDOWN_MS) return
   lastNotice.set(key, now)

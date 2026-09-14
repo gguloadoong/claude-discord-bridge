@@ -160,6 +160,7 @@ Discord message
 | `slug` | Short name for tmux window tab |
 | `port` | Local HTTP port (unique per channel, starting from 8801) |
 | `cwd` | Absolute path to the project directory |
+| `allow_proactive` | Optional. `true` lets this channel push alerts on its own. **Default `false`** — the session may only speak when spoken to |
 
 ### Environment Variables
 
@@ -169,6 +170,7 @@ Discord message
 | `BRIDGE_SECRET` | No | Shared secret for bot↔server authentication |
 | `CONFIG_PATH` | No | Custom path to config.json |
 | `REPLY_TIMEOUT_MS` | No | Warn in Discord if a delivered message gets no reply (default `120000`, `0` disables) |
+| `BOT_NOTICES` | No | `0` keeps the bot's own diagnostic notices out of Discord (log only) |
 
 ### Security
 
@@ -263,6 +265,33 @@ setup, *do you trust the files in this folder*, a re-login. The MCP server never
 comes up, so the channel looks identical to every other failure. `monitor.js`
 detects those prompts and the bot reports them to Discord with the prompt text.
 
+### "A channel keeps posting messages nobody asked for"
+
+By default a channel **answers, it never announces**. The session is told never
+to send an unprompted message — no startup greeting, no status update, no
+handover or session-summary notice. Starting or resuming a session is not a
+reason to post.
+
+A channel that genuinely needs to push alerts opts in explicitly:
+
+```json
+{
+  "name": "market-radar",
+  "slug": "market",
+  "port": 8801,
+  "cwd": "/path/to/project",
+  "allow_proactive": true
+}
+```
+
+Only that channel's session is allowed to speak first, and only for alerts the
+user asked for. If unprompted messages still appear in a channel without the
+flag, they are coming from the project itself — check that project's
+`CLAUDE.md` and `.claude/settings.json` for a SessionStart hook.
+
+The bot's own notices (limit reached, session down) are separate: set
+`BOT_NOTICES=0` to silence those too.
+
 ### "Every channel went silent at once"
 
 Usage limits are account-wide, so a single limit parks **all** channel sessions
@@ -316,6 +345,7 @@ claude-discord-bridge/
 ├── setup.js            # Interactive setup wizard
 ├── doctor.js           # Diagnoses "the bot doesn't answer" (npm run doctor)
 ├── run-channel.sh      # Supervises one channel session (restarts if it exits)
+├── smoke.sh            # Loads every entry point (npm run smoke)
 ├── start.sh            # tmux session launcher
 ├── config.json         # Channel → project mapping (generated)
 ├── config.example.json # Template for config.json
